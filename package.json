@@ -1,0 +1,7 @@
+{
+  "name": "tpat3-factory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "โรงงานผลิตชีทโจทย์ TPAT3 ของ mingsmileyface",
+  "dependencies": { "docx": "^9.0.0" }
+}
