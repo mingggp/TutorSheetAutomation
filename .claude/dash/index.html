@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ห้องควบคุม — โรงงานชีท TPAT3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0d1618; --surface:#132022; --surface-2:#18292c; --surface-3:#1e3236;
+  --ink:#e4eef0; --ink-2:#b3c8cb; --muted:#89a2a6;
+  --line:#23393d; --line-strong:#335257;
+  --accent:#00d5c9; --accent-deep:#00a99f;
+  --mark:#ff5c86; --warn:#e0a03c; --good:#5ad39a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Sarabun","Segoe UI",system-ui,sans-serif; font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+/* ---------- โครง ---------- */
+.shell{max-width:1180px; margin:0 auto; padding:24px 22px 60px}
+header.bar{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding-bottom:16px; margin-bottom:22px; border-bottom:2px solid var(--accent);
+}
+h1{margin:0; font-size:1.35rem; font-weight:700; letter-spacing:-.01em}
+h1 span{color:var(--accent)}
+.pulse{
+  width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none;
+  box-shadow:0 0 0 0 rgba(0,213,201,.5);
+}
+.pulse.live{background:var(--accent); animation:beat 1.8s ease-out infinite}
+@keyframes beat{0%{box-shadow:0 0 0 0 rgba(0,213,201,.55)}70%{box-shadow:0 0 0 11px rgba(0,213,201,0)}100%{box-shadow:0 0 0 0 rgba(0,213,201,0)}}
+.bar .right{margin-left:auto; display:flex; align-items:center; gap:18px}
+.bar .stat{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+.bar .stat b{display:block; font-size:1.25rem; color:var(--ink); font-weight:600; letter-spacing:0; font-variant-numeric:tabular-nums}
+
+h2{
+  margin:30px 0 12px; font-size:11px; font-weight:600; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--muted);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+}
+h2:first-of-type{margin-top:0}
+
+/* ---------- ใครกำลังทำอะไร ---------- */
+.lanes{display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px}
+.lane{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; display:flex; flex-direction:column; gap:9px; position:relative; overflow:hidden;
+}
+.lane.busy{border-color:var(--accent-deep)}
+.lane.busy::before{
+  content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent);
+}
+.lane .who{display:flex; align-items:center; gap:9px}
+.lane .nm{font-weight:700; font-size:1.02rem}
+.lane .tag{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 8px; border-radius:20px; background:var(--surface-3); color:var(--muted);
+}
+.lane.busy .tag{background:rgba(0,213,201,.14); color:var(--accent)}
+.lane .doing{font-size:.9rem; color:var(--ink-2); min-height:1.5em}
+.lane .doing .tool{
+  font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--accent); margin-right:7px;
+}
+.lane .what{
+  font-family:"IBM Plex Mono",monospace; font-size:.78rem; color:var(--muted);
+  word-break:break-all; line-height:1.5; max-height:3em; overflow:hidden;
+}
+.lane .foot{display:flex; gap:16px; font-size:.76rem; color:var(--muted); font-family:"IBM Plex Mono",monospace}
+.lane .foot b{color:var(--ink-2); font-weight:500; font-variant-numeric:tabular-nums}
+
+/* ---------- ลำดับเหตุการณ์ ---------- */
+.feed{border:1px solid var(--line); border-radius:12px; background:var(--surface); overflow:hidden}
+.row{
+  display:grid; grid-template-columns:74px 96px 1fr 66px; gap:12px; align-items:baseline;
+  padding:7px 16px; border-bottom:1px solid var(--line); font-size:.85rem;
+}
+.row:last-child{border-bottom:none}
+.row:nth-child(even){background:rgba(255,255,255,.012)}
+.row .t{font-family:"IBM Plex Mono",monospace; font-size:.74rem; color:var(--muted); font-variant-numeric:tabular-nums}
+.row .k{font-family:"IBM Plex Mono",monospace; font-size:.76rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .d{color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:"IBM Plex Mono",monospace; font-size:.79rem}
+.row .ms{font-family:"IBM Plex Mono",monospace; font-size:.74rem; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
+.k-tool{color:var(--accent)}
+.k-agent{color:var(--warn)}
+.k-turn{color:var(--ink)}
+.k-fail{color:var(--mark)}
+.row.slow .ms{color:var(--warn)}
+.row.fail .d{color:var(--mark)}
+
+/* ---------- สรุปเครื่องมือ ---------- */
+.tools{display:flex; flex-wrap:wrap; gap:8px}
+.chip{
+  display:flex; align-items:baseline; gap:8px; padding:6px 12px; border-radius:20px;
+  background:var(--surface); border:1px solid var(--line);
+  font-family:"IBM Plex Mono",monospace; font-size:.78rem;
+}
+.chip b{color:var(--accent); font-weight:600; font-variant-numeric:tabular-nums}
+.chip i{font-style:normal; color:var(--muted); font-size:.72rem}
+
+.empty{
+  padding:44px 20px; text-align:center; color:var(--muted); font-size:.92rem;
+  border:1px dashed var(--line-strong); border-radius:12px;
+}
+.empty code{background:var(--surface-2); padding:.15em .5em; border-radius:5px; color:var(--ink-2)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media (max-width:620px){
+  .row{grid-template-columns:58px 1fr 56px}
+  .row .k{display:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="bar">
+  <span class="pulse" id="pulse"></span>
+  <h1>ห้องควบคุม <span>โรงงานชีท TPAT3</span></h1>
+  <div class="right">
+    <div class="stat">กำลังทำงาน<b id="s-busy">0</b></div>
+    <div class="stat">เหตุการณ์<b id="s-ev">0</b></div>
+    <div class="stat">เครื่องมือ<b id="s-tool">0</b></div>
+    <div class="stat">พัง<b id="s-fail">0</b></div>
+  </div>
+</header>
+
+<h2>ใครกำลังทำอะไร</h2>
+<div id="lanes" class="lanes"></div>
+
+<h2>เครื่องมือที่ใช้ไป</h2>
+<div id="tools" class="tools"></div>
+
+<h2>ลำดับเหตุการณ์ (ล่าสุดอยู่บน)</h2>
+<div id="feed" class="feed"></div>
+
+</div>
+
+<script>
+const MAXROWS = 260;
+let lastLen = 0, events = [];
+
+const hhmmss = ts => {
+  const d = new Date(ts * 1000);
+  return String(d.getHours()).padStart(2,'0') + ':' +
+         String(d.getMinutes()).padStart(2,'0') + ':' +
+         String(d.getSeconds()).padStart(2,'0');
+};
+const dur = ms => ms == null ? '' : ms < 1000 ? Math.round(ms)+'ms'
+              : ms < 60000 ? (ms/1000).toFixed(1)+'s'
+              : Math.floor(ms/60000)+'m'+String(Math.round(ms%60000/1000)).padStart(2,'0');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function tick(){
+  let text;
+  try{
+    const r = await fetch('activity.jsonl?_=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) throw 0;
+    text = await r.text();
+  }catch(e){ document.getElementById('pulse').classList.remove('live'); return; }
+
+  document.getElementById('pulse').classList.add('live');
+  if(text.length === lastLen) return;
+  lastLen = text.length;
+
+  events = text.split('\n').filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } }).filter(Boolean);
+  render();
+}
+
+function render(){
+  const now = Date.now()/1000;
+
+  // --- จับคู่ เริ่ม↔จบ ของเครื่องมือแต่ละตัว ---
+  const open = new Map();       // key -> event ที่ยังไม่จบ
+  const rows = [];
+  const toolCount = new Map();
+  let fails = 0;
+
+  const keyOf = e => e.tid || (e.sid + '|' + e.tool);
+
+  for(const e of events){
+    if(e.ev === 'PreToolUse'){
+      const k = keyOf(e);
+      const rec = {...e, open:true};
+      open.set(k, rec);
+      rows.push(rec);
+      toolCount.set(e.tool, (toolCount.get(e.tool)||0) + 1);
+    } else if(e.ev === 'PostToolUse' || e.ev === 'PostToolUseFailure'){
+      const k = keyOf(e);
+      const s = open.get(k);
+      if(s){ s.open = false; s.ms = (e.ts - s.ts) * 1000; s.ok = e.ok !== false && e.ev !== 'PostToolUseFailure'; open.delete(k); }
+      if(e.ev === 'PostToolUseFailure' || e.ok === false) fails++;
+    } else {
+      rows.push({...e});
+      if(e.ev === 'SubagentStart'){ const r = {...e, open:true, lane:true}; open.set('agent|'+(e.agent||e.sid), r); }
+      if(e.ev === 'SubagentStop'){ open.delete('agent|'+(e.agent||e.sid)); }
+    }
+  }
+
+  // --- เลนของแต่ละสาย ---
+  const bySid = new Map();
+  for(const e of events){
+    if(!e.sid) continue;
+    if(!bySid.has(e.sid)) bySid.set(e.sid, {sid:e.sid, name:null, n:0, last:0, cur:null});
+    const L = bySid.get(e.sid);
+    L.n++; L.last = Math.max(L.last, e.ts);
+    // ตั้งชื่อเลนจากตอนที่สายนั้น "เป็น" agent เท่านั้น
+    // ไม่ใช่ตอนที่มัน "สั่ง" agent (Task) ไม่งั้นสายหลักจะถูกสวมชื่อลูกน้อง
+    if(e.agent && (e.ev === 'SubagentStart' || e.ev === 'SubagentStop')) L.name = e.agent;
+  }
+  for(const r of rows){ if(r.open && r.tool && bySid.has(r.sid)) bySid.get(r.sid).cur = r; }
+
+  const lanes = [...bySid.values()].sort((a,b) => b.last - a.last);
+  let busy = 0;
+  document.getElementById('lanes').innerHTML = lanes.length ? lanes.map(L => {
+    const isBusy = !!L.cur || (now - L.last) < 12;
+    if(isBusy) busy++;
+    const c = L.cur;
+    return `<div class="lane ${isBusy?'busy':''}">
+      <div class="who">
+        <span class="nm">${esc(L.name || 'สายหลัก')}</span>
+        <span class="tag">${isBusy ? 'ทำงานอยู่' : 'ว่าง'}</span>
+      </div>
+      <div class="doing">${c ? `<span class="tool">${esc(c.tool)}</span>` : '<span style="color:var(--muted)">— รออยู่ —</span>'}</div>
+      <div class="what">${c ? esc(c.what) : ''}</div>
+      <div class="foot">
+        <span>เหตุการณ์ <b>${L.n}</b></span>
+        <span>ล่าสุด <b>${hhmmss(L.last)}</b></span>
+        ${c ? `<span>ค้าง <b>${dur((now-c.ts)*1000)}</b></span>` : ''}
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty">ยังไม่มีสัญญาณเข้ามา — สั่งงาน Claude Code สักอย่าง แล้วบรรทัดจะไหลเข้ามาที่นี่เอง</div>`;
+
+  // --- ชิปสรุปเครื่องมือ ---
+  const chips = [...toolCount.entries()].sort((a,b) => b[1]-a[1]).slice(0,16);
+  document.getElementById('tools').innerHTML = chips.length
+    ? chips.map(([t,n]) => `<span class="chip">${esc(t)} <b>${n}</b></span>`).join('')
+    : '<span class="chip"><i>ยังไม่มี</i></span>';
+
+  // --- ฟีด ---
+  const feed = rows.slice(-MAXROWS).reverse();
+  document.getElementById('feed').innerHTML = feed.length ? feed.map(r => {
+    let cls = 'k-tool', label = r.tool || r.ev;
+    if(!r.tool){
+      if(r.ev === 'SubagentStart' || r.ev === 'SubagentStop'){ cls = 'k-agent'; label = r.agent || 'agent'; }
+      else cls = 'k-turn';
+    }
+    const bad = r.ok === false;
+    const slow = r.ms > 8000;
+    const what = r.ev === 'UserPromptSubmit' ? '▸ ' + (r.what || '')
+               : r.ev === 'SubagentStart' ? 'เริ่มงาน: ' + (r.task || r.what || '')
+               : r.ev === 'SubagentStop' ? 'จบงาน'
+               : r.ev === 'Stop' ? '— จบเทิร์น —'
+               : r.ev === 'SessionStart' ? '— เปิด session —'
+               : (r.what || '');
+    return `<div class="row ${bad?'fail':''} ${slow?'slow':''}">
+      <span class="t">${hhmmss(r.ts)}</span>
+      <span class="k ${bad?'k-fail':cls}">${esc(label)}</span>
+      <span class="d">${esc(what)}</span>
+      <span class="ms">${r.open ? '···' : dur(r.ms)}</span>
+    </div>`;
+  }).join('') : `<div class="empty">ว่างเปล่า — ไฟล์ <code>activity.jsonl</code> ยังไม่มีบรรทัด</div>`;
+
+  document.getElementById('s-busy').textContent = busy;
+  document.getElementById('s-ev').textContent = events.length;
+  document.getElementById('s-tool').textContent = [...toolCount.values()].reduce((a,b)=>a+b,0);
+  document.getElementById('s-fail').textContent = fails;
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

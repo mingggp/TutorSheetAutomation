@@ -4,3 +4,4 @@ out/
 __pycache__/
 *.docx
 *.pdf
+.claude/dash/activity.jsonl
