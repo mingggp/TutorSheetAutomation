@@ -307,6 +307,19 @@ def strip(files, name, gap=26, labh=26, lab=True):
         x += i2.width + gap
     return _save(im, W, h + (labh if lab else 0), name)
 
+def vstack(files, name, gap=10):
+    """ต่อภาพในแนวตั้ง จัดกึ่งกลางแนวนอน — ใช้ประกอบเมทริกซ์รูปภาพจากแถวย่อย"""
+    ims = [Image.open(os.path.join(IMG, f)) for f in files]
+    W = max(i.width for i in ims)
+    H = sum(i.height for i in ims) + gap * (len(ims) - 1)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    y = 0
+    for i2 in ims:
+        im.paste(i2.resize((i2.width * S, i2.height * S), Image.LANCZOS),
+                 (((W - i2.width) // 2) * S, y * S))
+        y += i2.height + gap
+    return _save(im, W, H, name)
+
 def compose(files, name, seps=None, gap=18, capt=None, capth=22):
     """ต่อภาพในแนวนอน คั่นด้วยข้อความ (เช่น : กับ ::) และมีคำบรรยายใต้ภาพได้"""
     ims = [Image.open(os.path.join(IMG, f)) for f in files]

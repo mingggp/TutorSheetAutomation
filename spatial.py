@@ -195,6 +195,74 @@ def series(rng, want=0, n=5, steps=3, hard=False):
 
 
 # ============================================================
+#  เมทริกซ์รูปภาพ 3×3 ช่องขวาล่างหาย — ของจริงออก 10% ของพาร์ท 2
+#
+#  ทุกคุณลักษณะเดินเป็นจตุรัสละติน: ในหนึ่งแถวและหนึ่งหลัก
+#  ค่าของคุณลักษณะนั้นจะปรากฏครบทั้งสามค่าพอดี ไม่ซ้ำไม่ขาด
+#  ช่องที่หายจึงถูกบังคับค่าเดียวโดยอัตโนมัติ และผู้สอบอนุมานได้จริง
+#  ไม่ใช่คำตอบที่ถูกเพราะคนออกบอกว่าถูก
+# ============================================================
+
+M_SHAPES = ["circle", "square", "triangle", "diamond", "star", "hexagon", "cross", "plus"]
+M_ROTSHAPES = ["triangle", "arrow", "star", "pentagon"]   # เฉพาะรูปที่หมุนแล้วเห็นความต่าง
+M_FILLS = ["white", "black", "grey"]
+M_ROTS = [0, 90, 180, 270]
+
+
+def _latin(vals, r, c, a, b):
+    """ค่าของคุณลักษณะที่ตำแหน่ง (r,c) — (a*r + b*c) mod 3 เป็นจตุรัสละตินเสมอเมื่อ b ไม่หารด้วย 3 ลงตัว"""
+    return vals[(a * r + b * c) % 3]
+
+
+def matrix(rng, want=0, attrs=2):
+    """attrs=2 → รูปทรง + การเติมสี (★★☆) · attrs=3 → เพิ่มการหมุนอีกชั้น (★★★)
+
+    คืน (cells, choices, ansIdx) โดย cells เป็นตาราง 3×3 ของ (shape, fill, rot)
+    ช่อง (2,2) คือช่องที่ต้องเดา — ตัวเรียกต้องวาดเป็น "?" แทน
+    """
+    for _ in range(400):
+        pool = M_ROTSHAPES if attrs == 3 else M_SHAPES
+        sh = rng.sample(pool, 3)
+        fl = rng.sample(M_FILLS, 3)
+        rt = rng.sample(M_ROTS, 3) if attrs == 3 else [0, 0, 0]
+
+        def cell(r, c):
+            return (_latin(sh, r, c, 1, 1),
+                    _latin(fl, r, c, 1, 2),
+                    _latin(rt, r, c, 2, 1) if attrs == 3 else 0)
+
+        cells = [[cell(r, c) for c in range(3)] for r in range(3)]
+        truth = cells[2][2]
+
+        cand = [(s, f, t) for s in sh for f in fl for t in (rt if attrs == 3 else [0])]
+        rng.shuffle(cand)
+        wrong = _pick5(truth, cand, rng)
+        if wrong is None:
+            continue
+
+        opts, idx = _place([truth] + wrong, truth, want)
+        if sum(1 for o in opts if o == truth) != 1:
+            continue
+        return cells, opts, idx
+    raise RuntimeError("สร้างโจทย์เมทริกซ์รูปภาพไม่สำเร็จ")
+
+
+def forced(cells, k):
+    """ค่าที่ช่อง (2,2) ถูกบังคับให้เป็น เมื่อดูจากคุณลักษณะที่ k ของอีก 8 ช่อง
+
+    คืน None ถ้าแถวกับหลักบังคับไม่ตรงกัน หรือบังคับไม่ได้ — แปลว่าโจทย์ใช้ไม่ได้
+    """
+    row = [cells[2][c][k] for c in range(2)]
+    col = [cells[r][2][k] for r in range(2)]
+    allv = {cells[r][c][k] for r in range(3) for c in range(3) if (r, c) != (2, 2)}
+    from_row = [v for v in allv if v not in row]
+    from_col = [v for v in allv if v not in col]
+    if len(from_row) != 1 or len(from_col) != 1 or from_row[0] != from_col[0]:
+        return None
+    return from_row[0]
+
+
+# ============================================================
 #  ต่อเข้ากับเครื่องวาด — import ข้างในฟังก์ชันโดยตั้งใจ
 #  เพื่อให้ตัวตรวจด้านล่างรันได้โดยไม่ต้องพึ่ง draw.py และ Pillow
 # ============================================================
@@ -203,6 +271,32 @@ OVERLAY_STEM = ("แผ่นใสสองแผ่นด้านบนมี
                 "ถ้านำแผ่นทั้งสองมาวางซ้อนกันสนิทแล้วส่องไฟผ่าน ภาพที่ได้คือข้อใด")
 
 SERIES_STEM = ("ภาพทั้งสามด้านบนเรียงตามกฎเดียวกัน ภาพลำดับถัดไปคือข้อใด")
+
+MATRIX_STEM = ("จากตารางด้านบน ทุกแถวและทุกหลักเดินตามกฎเดียวกัน ภาพในช่อง ? คือข้อใด")
+
+
+def _cellimg(spec, name):
+    """วาดหนึ่งช่องของเมทริกซ์จาก (shape, fill, rot)"""
+    import draw as D
+    s, f, t = spec
+    return D.symbox([{"shape": s, "fill": f, "rot": t}], name)
+
+
+def render_matrix(cells, opts, tag):
+    import draw as D
+    rows = []
+    for r in range(3):
+        imgs = []
+        for c in range(3):
+            if (r, c) == (2, 2):
+                # ขนาดต้องเท่า symbox พอดี: size 74 + pad 6 สองข้าง = 86
+                imgs.append(D.grid(1, 1, name=f"{tag}qm", cell=74, pad=6, center="?"))
+            else:
+                imgs.append(_cellimg(cells[r][c], f"{tag}c{r}{c}"))
+        rows.append(D.strip(imgs, f"{tag}r{r}", gap=8, lab=False))
+    stem = D.vstack(rows, tag + "q", gap=8)
+    files = [_cellimg(o, f"{tag}o{i}") for i, o in enumerate(opts)]
+    return stem, D.strip(files, tag + "opt")
 
 
 def render_overlay(A, B, opts, tag, cell=15):
@@ -257,6 +351,21 @@ def build(add, P2, rng):
     img, optimg = render_overlay(A, B, opts, "ovh", cell=12)
     add(P2, "ซ้อนแผ่นบังแสง", OVERLAY_STEM, [""] * 5, idx,
         img=img, optimg=optimg, lvl=3)
+    want = (want + 2) % 5
+
+    for qi in range(2):                       # ★★☆ เมทริกซ์ สองคุณลักษณะ
+        cells, opts, idx = matrix(rng, want=want, attrs=2)
+        img, optimg = render_matrix(cells, opts, f"mx{qi}")
+        add(P2, "เมทริกซ์รูปภาพ", MATRIX_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=2)
+        want = (want + 2) % 5
+
+    for qi in range(2):                       # ★★★ เมทริกซ์ สามคุณลักษณะ มีการหมุนซ้อน
+        cells, opts, idx = matrix(rng, want=want, attrs=3)
+        img, optimg = render_matrix(cells, opts, f"mh{qi}")
+        add(P2, "เมทริกซ์รูปภาพ", MATRIX_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=3)
+        want = (want + 2) % 5
 
 
 # ============================================================
@@ -298,6 +407,28 @@ if __name__ == "__main__":
                 check(step(frames[i]) == frames[i + 1],
                       f"series s={s} hard={hard}: ภาพที่ {i+2} ไม่ได้มาจากกฎ")
 
+    for attrs in (2, 3):
+        cells, opts, idx = matrix(rng, want=want, attrs=attrs)
+        truth = cells[2][2]
+        check(len(set(opts)) == 5, f"matrix s={s} attrs={attrs}: ตัวเลือกซ้ำกัน")
+        check(idx == want, f"matrix s={s} attrs={attrs}: บังคับตำแหน่งเฉลยไม่ได้")
+        check(opts[idx] == truth, f"matrix s={s} attrs={attrs}: เฉลยไม่ใช่ช่องที่หาย")
+        check(sum(1 for o in opts if o == truth) == 1,
+              f"matrix s={s} attrs={attrs}: มีคำตอบถูกเกินหนึ่ง")
+        # หัวใจ: ผู้สอบต้องอนุมานได้จริงจาก 8 ช่องที่เห็น ไม่ใช่ถูกเพราะคนออกบอกว่าถูก
+        for k in range(3 if attrs == 3 else 2):
+            check(forced(cells, k) == truth[k],
+                  f"matrix s={s} attrs={attrs}: คุณลักษณะที่ {k} อนุมานจากแถว/หลักไม่ได้")
+        # ทุกแถวและทุกหลักต้องมีค่าครบสามค่า ไม่ซ้ำไม่ขาด
+        for k in range(3 if attrs == 3 else 2):
+            for r in range(3):
+                check(len({cells[r][c][k] for c in range(3)}) == 3,
+                      f"matrix s={s} attrs={attrs}: แถว {r} คุณลักษณะ {k} ไม่ครบสามค่า")
+            for c in range(3):
+                check(len({cells[r][c][k] for r in range(3)}) == 3,
+                      f"matrix s={s} attrs={attrs}: หลัก {c} คุณลักษณะ {k} ไม่ครบสามค่า")
+
+
     def show(g):
         return "\n      ".join("".join("██" if v else "·　" for v in row) for row in g)
 
@@ -321,4 +452,4 @@ if __name__ == "__main__":
             print("[พัง]", m)
         print(f"พบปัญหา {len(bad)} จุด")
         sys.exit(1)
-    print("ตรวจผ่าน 360 ข้อ (ซ้อนแผ่น 120 · อนุกรมสองดาว 120 · อนุกรมสามดาว 120)")
+    print("ตรวจผ่าน 600 ข้อ — ซ้อนแผ่น 120 · อนุกรม 240 · เมทริกซ์ 240")
