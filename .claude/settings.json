@@ -1,28 +1,95 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py SessionStart", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py SessionStart",
+            "async": true
+          }
+        ]
+      }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py UserPromptSubmit", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py UserPromptSubmit",
+            "async": true
+          }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py PreToolUse", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py PreToolUse",
+            "async": true
+          }
+        ],
+        "matcher": "*"
+      }
     ],
     "PostToolUse": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py PostToolUse", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py PostToolUse",
+            "async": true
+          }
+        ],
+        "matcher": "*"
+      }
     ],
     "PostToolUseFailure": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py PostToolUseFailure", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py PostToolUseFailure",
+            "async": true
+          }
+        ],
+        "matcher": "*"
+      }
     ],
     "SubagentStart": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py SubagentStart", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py SubagentStart",
+            "async": true
+          }
+        ]
+      }
     ],
     "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py SubagentStop", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py SubagentStop",
+            "async": true
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "python .claude/hooks/log.py Stop", "async": true }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log.py Stop",
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }
