@@ -292,7 +292,9 @@ def tri(vals, name, w=112, h=100, pad=8):
 
 # ---------------------------------------------------------------- ประกอบภาพ
 LAB = "กขคงจ"
-def strip(files, name, gap=26, labh=26, lab=True):
+def strip(files, name, gap=26, labh=26, lab=True, labels=None):
+    """labels = ป้ายหน้าตัวเลือกเอง เช่น ["1)","2)",...] สำหรับ TGAT2
+    ไม่ใส่ = ใช้ ก. ข. ค. ง. จ. ตามสไตล์เดิม"""
     ims = [Image.open(os.path.join(IMG, f)) for f in files]
     h = max(i.height for i in ims)
     W = sum(i.width for i in ims) + gap * (len(ims) - 1)
@@ -301,7 +303,7 @@ def strip(files, name, gap=26, labh=26, lab=True):
     for k, i2 in enumerate(ims):
         im.paste(i2.resize((i2.width*S, i2.height*S), Image.LANCZOS), (x*S, (h - i2.height)*S))
         if lab:
-            t = LAB[k] + "."
+            t = labels[k] if labels else LAB[k] + "."
             tw = d.textlength(t, font=f)
             d.text((x*S + (i2.width*S - tw)/2, (h + 4)*S), t, font=f, fill=INK)
         x += i2.width + gap

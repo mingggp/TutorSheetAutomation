@@ -46,7 +46,7 @@ const cnt=[1,2,3].map(lv=>QS.filter(q=>q.lvl===lv).length);
 const F="Sarabun";
 const SUBC=SUB.color, T1="00D5C9", T3="28A1AB";
 const INK="1F2528", MID="5B6669", SOFT="9AA5A8", HAIR="D3DADC";
-const CH="กขคงจ", BODY=27, USABLE=9638, MAXIMG=600, IND=580;
+const CH=SUB.optionLabels||["ก.","ข.","ค.","ง.","จ."], BODY=27, USABLE=9638, MAXIMG=600, IND=580;
 
 const T=(t,o={})=>new TextRun({text:t,font:F,size:o.size||BODY,bold:o.bold,color:o.color||INK});
 const P=(runs,o={})=>new Paragraph({
@@ -76,13 +76,13 @@ function questionKept(q,i){
   if(q.img)    push([pic(q.img,{scale:0.80})],{align:AlignmentType.CENTER,before:200,after:100,line:0});
   if(q.optimg) push([pic(q.optimg,{scale:0.92})],{align:AlignmentType.CENTER,before:130,after:120,line:0});
   else if(q.choices.some(c=>c.length>10) || q.choices.join("").length>44){
-    q.choices.forEach((c,k)=>push([T(CH[k]+".   ",{bold:true}),T(c)],
+    q.choices.forEach((c,k)=>push([T(CH[k]+"   ",{bold:true}),T(c)],
       {before:80,after:80,indent:{left:IND+260,hanging:260}}));
   } else {
     const runs=[];
     q.choices.forEach((c,k)=>{
       if(k) runs.push(new TextRun({children:[new Tab()],font:F,size:BODY}));
-      runs.push(T(CH[k]+".  ",{bold:true}),T(c));
+      runs.push(T(CH[k]+"  ",{bold:true}),T(c));
     });
     push(runs,{before:130,after:60,indent:{left:IND},tabStops:COLTABS});
   }
