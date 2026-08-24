@@ -512,6 +512,20 @@ hard.build(add, addnum, P1, P2)
 import spatial
 spatial.build(add, P2, random.Random(5300 + SEED * 104729))
 
+# ==================================================================
+# TGAT2 — เอาเฉพาะ 3 ท่อนหลัง ติวเตอร์ไม่สอนตอนที่ 1 (ความสามารถทางภาษา)
+# ผังข้อสอบพิมพ์อยู่ในตัวข้อสอบเอง ดู reference/tgat2/DIGEST.md
+# ==================================================================
+G_NUM, G_SPA, G_REA = "ตอนที่ 2", "ตอนที่ 3", "ตอนที่ 4"
+
+import compare
+compare.build(add, G_NUM, random.Random(7100 + SEED * 104729), n=5, lvl=2)
+
+TG_BOXES = [("ภาษา", "20 ข้อ"), ("จำนวน", "20 ข้อ"),
+            ("มิติสัมพันธ์", "20 ข้อ"), ("เหตุผล", "20 ข้อ")]
+TG_GROUPS = [("ไม่สอน", 0, 0), ("ที่สอน", 1, 3)]
+D.header({1, 2, 3}, "hdr_tgat2", boxes=TG_BOXES, groups=TG_GROUPS)
+
 D.header({0, 1}, "hdr_math")
 D.header({2, 3}, "hdr_phys")
 D.badge("mingsmileyface", "badge")

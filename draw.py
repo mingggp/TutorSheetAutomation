@@ -354,7 +354,15 @@ GROUPS = [("คณิต", 0, 1), ("ฟิสิกส์", 2, 3), ("ข่า�
 ACTIVE = [(0, 213, 201), (40, 161, 171), (0, 200, 181), (40, 161, 171), (213, 0, 77)]
 DIM    = (183, 190, 192)
 
-def header(active, name, bw=172, bh=74, gapin=14, gapout=38, pad=6):
+def header(active, name, bw=172, bh=74, gapin=14, gapout=38, pad=6,
+           boxes=None, groups=None):
+    """flowchart โครงสร้างข้อสอบใต้หัวกระดาษ
+
+    boxes/groups ไม่ใส่ = ใช้ผังของ TPAT3 · ใส่มา = วาดผังของวิชาอื่น
+    boxes  = [(ชื่อท่อน, จำนวนข้อ), ...]
+    groups = [(ชื่อกลุ่ม, ดัชนีเริ่ม, ดัชนีจบ), ...] วงเล็บครอบท่อนที่อยู่กลุ่มเดียวกัน"""
+    boxes = boxes or BOXES
+    groups = groups or GROUPS
     """active = set ของ index กล่องที่ยังใช้งาน  ที่เหลือเป็นสีจาง"""
     xs, x = [], pad
     for i in range(5):
@@ -364,7 +372,7 @@ def header(active, name, bw=172, bh=74, gapin=14, gapout=38, pad=6):
     H = pad + bh + 18 + 30
     im = Image.new("RGB", (W*S, H*S), "white"); d = ImageDraw.Draw(im)
     ftitle = font(25, True); fsub = font(17, False); fgrp = font(15, True)
-    for i, (t1, t2) in enumerate(BOXES):
+    for i, (t1, t2) in enumerate(boxes):
         on = i in active
         col = ACTIVE[i] if on else DIM
         x0, y0 = xs[i]*S, pad*S
@@ -376,7 +384,7 @@ def header(active, name, bw=172, bh=74, gapin=14, gapout=38, pad=6):
         d.text((x0 + (bw*S - tw)/2, y0 + bh*S*0.52), t2, font=fsub,
                fill=(70,80,84) if on else DIM)
     yb = (pad + bh + 9)*S
-    for gname, a, b in GROUPS:
+    for gname, a, b in groups:
         on = a in active
         col = ACTIVE[a] if on else DIM
         x0, x1 = xs[a]*S, (xs[b] + bw)*S

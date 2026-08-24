@@ -38,8 +38,11 @@ function pickPart(part,quota){
   // เรียงจากง่ายไปยากภายในพาร์ท (ภายในระดับเดียวกันยังจัดกลุ่มตามแนวโจทย์)
   return out.sort((a,b)=>a.q.lvl-b.q.lvl || a.i-b.i).map(o=>o.q);
 }
-const half=Math.round(N/2);
-const QS=[...pickPart(SUB.parts[0].key,half),...pickPart(SUB.parts[1].key,N-half)];
+// แบ่งโควตาให้ทุกพาร์ทเท่า ๆ กัน เศษที่เหลือตกกับพาร์ทต้น ๆ
+// (TPAT3 มี 2 พาร์ท · TGAT2 มี 3 ท่อน · วิชาต่อไปอาจไม่เท่านี้)
+const NP=SUB.parts.length;
+const quota=SUB.parts.map((_,i)=>Math.floor(N/NP)+(i<N%NP?1:0));
+const QS=SUB.parts.flatMap((p,i)=>pickPart(p.key,quota[i]));
 const cnt=[1,2,3].map(lv=>QS.filter(q=>q.lvl===lv).length);
 
 // ---------- สไตล์ ----------
