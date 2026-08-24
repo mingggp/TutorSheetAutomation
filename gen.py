@@ -508,7 +508,7 @@ setlv(3)
 hard.build(add, addnum, P1, P2)
 
 # แนวที่ข้อสอบจริงออกมากที่สุดในพาร์ท 2 แต่คลังเคยมี 0 ข้อ
-# (ดู reference/DIGEST-part2.md หัวข้อ 3.1) — ตัวนี้กำหนด lvl มาเองในแต่ละข้อ
+# (ดู reference/tpat3/DIGEST-part2.md หัวข้อ 3.1) — ตัวนี้กำหนด lvl มาเองในแต่ละข้อ
 import spatial
 spatial.build(add, P2, random.Random(5300 + SEED * 104729))
 
