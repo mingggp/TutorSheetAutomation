@@ -195,6 +195,71 @@ def series(rng, want=0, n=5, steps=3, hard=False):
 
 
 # ============================================================
+#  ต่อเข้ากับเครื่องวาด — import ข้างในฟังก์ชันโดยตั้งใจ
+#  เพื่อให้ตัวตรวจด้านล่างรันได้โดยไม่ต้องพึ่ง draw.py และ Pillow
+# ============================================================
+
+OVERLAY_STEM = ("แผ่นใสสองแผ่นด้านบนมีช่องทึบแสงคนละตำแหน่งกัน\n"
+                "ถ้านำแผ่นทั้งสองมาวางซ้อนกันสนิทแล้วส่องไฟผ่าน ภาพที่ได้คือข้อใด")
+
+SERIES_STEM = ("ภาพทั้งสามด้านบนเรียงตามกฎเดียวกัน ภาพลำดับถัดไปคือข้อใด")
+
+
+def render_overlay(A, B, opts, tag, cell=15):
+    """คืน (img, optimg) สำหรับส่งเข้า add()"""
+    import draw as D
+    a = D.plate(A, tag + "a", cell=cell)
+    b = D.plate(B, tag + "b", cell=cell)
+    stem = D.compose([a, b], tag + "q", seps=["+"], gap=24,
+                     capt=["แผ่นที่ 1", "แผ่นที่ 2"])
+    files = [D.plate(o, f"{tag}o{i}", cell=cell - 2) for i, o in enumerate(opts)]
+    return stem, D.strip(files, tag + "opt")
+
+
+def render_series(frames, opts, tag, cell=15):
+    import draw as D
+    fs = [D.plate(f, f"{tag}f{i}", cell=cell) for i, f in enumerate(frames)]
+    stem = D.compose(fs, tag + "q", seps=[""] * (len(fs) - 1), gap=22,
+                     capt=[f"ภาพที่ {i+1}" for i in range(len(fs))])
+    files = [D.plate(o, f"{tag}o{i}", cell=cell - 2) for i, o in enumerate(opts)]
+    return stem, D.strip(files, tag + "opt")
+
+
+def build(add, P2, rng):
+    """เติมโจทย์สองแนวนี้เข้าคลัง — เรียกจาก gen.py
+
+    ตำแหน่งเฉลยถูกบังคับให้ไล่ ก-จ ครบวง เพื่อแก้ปัญหาที่ตัวเลือก จ.
+    แทบไม่เคยเป็นเฉลยเลยในคลังเดิม (กติกาข้อ 4)
+    """
+    want = 0
+    for qi in range(2):                       # ★★☆ ซ้อนแผ่นบังแสง
+        A, B, opts, idx = overlay(rng, want=want, n=6)
+        img, optimg = render_overlay(A, B, opts, f"ov{qi}")
+        add(P2, "ซ้อนแผ่นบังแสง", OVERLAY_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=2)
+        want = (want + 2) % 5
+
+    for qi in range(2):                       # ★★☆ อนุกรมรูปภาพ กฎชั้นเดียว
+        frames, opts, idx, _ = series(rng, want=want, hard=False)
+        img, optimg = render_series(frames, opts, f"sr{qi}")
+        add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=2)
+        want = (want + 2) % 5
+
+    for qi in range(2):                       # ★★★ อนุกรมรูปภาพ กฎซ้อนสองชั้น
+        frames, opts, idx, _ = series(rng, want=want, hard=True)
+        img, optimg = render_series(frames, opts, f"sh{qi}")
+        add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=3)
+        want = (want + 2) % 5
+
+    A, B, opts, idx = overlay(rng, want=want, n=8)   # ★★★ ตารางใหญ่ ภาระสายตาสูง
+    img, optimg = render_overlay(A, B, opts, "ovh", cell=12)
+    add(P2, "ซ้อนแผ่นบังแสง", OVERLAY_STEM, [""] * 5, idx,
+        img=img, optimg=optimg, lvl=3)
+
+
+# ============================================================
 #  ตัวตรวจ — พิสูจน์ว่าโจทย์ที่ผลิตออกมาตอบได้ทางเดียวจริง
 #  รันได้โดยไม่ต้องมี draw.py: python spatial.py
 # ============================================================

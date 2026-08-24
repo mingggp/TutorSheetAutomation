@@ -125,6 +125,139 @@ def numgrid(rows, name, cell=44, pad=8):
             d.text((x0 + (cell*S - tw)/2, y0 + cell*S*.20), t, font=f, fill=INK)
     return _save(im, W, H, name)
 
+# ---------------------------------------------------------------- ขาวดำล้วน: แผ่นตาราง / กรอบสัญลักษณ์
+# ใช้กับพาร์ท 2 แนวที่ข้อสอบจริงเป็น line art ดำบนขาว
+# (อนุกรมรูปภาพ · เมทริกซ์รูปภาพ · ซ้อนแผ่นบังแสง · หารูปไม่เข้าพวก · อุปมาอุปมัยรูปภาพ)
+# โทนที่ใช้ได้มีสามระดับเท่านั้น: ขาว(โปร่ง) / เทากลาง / ดำทึบ — ห้ามใช้สีติวเตอร์ในสองฟังก์ชันนี้
+import math
+
+_GREY = (128, 128, 128)      # โทนที่สาม
+_HAIR = (150, 150, 150)      # เส้นตารางบาง มองเห็นได้ทั้งบนช่องขาวและช่องทึบ
+_LW   = max(1, int(round(S * 1.3)))   # เส้นหลัก หนาเท่ากันหมดตามสไตล์ข้อสอบจริง
+_HW   = max(1, int(round(S * 0.7)))   # เส้นตารางบาง
+
+def plate(rows, name, cell=16, pad=6, frame=True, grid=True):
+    """ตารางช่องทึบ/โปร่ง — ใช้ได้ทั้งแผ่นบังแสง ลายจุด และช่องในเมทริกซ์
+
+    rows  : list[list[int]]  1 = ช่องทึบ (เติมสีเข้ม)  0 = ช่องโปร่ง (ขาว)
+            (ส่วนขยาย: 2 = ช่องเทา สำหรับโจทย์ที่ต้องใช้โทนที่สาม)
+    grid  : True = ตีเส้นแบ่งช่องจางๆ   False = ไม่ตีเส้น (ให้เห็นเป็นลายทึบล้วน)
+    frame : True = ตีกรอบนอกเข้ม
+    คืนค่า: ชื่อไฟล์ .png (เหมือน grid/numgrid เดิม)
+    """
+    R = len(rows)
+    C = max((len(r) for r in rows), default=0)
+    W, H = C * cell + pad * 2, R * cell + pad * 2
+    im = Image.new("RGB", (W * S, H * S), "white"); d = ImageDraw.Draw(im)
+    ax, ay = pad * S, pad * S
+    bx, by = (pad + C * cell) * S, (pad + R * cell) * S
+    for r in range(R):
+        for c in range(len(rows[r])):
+            v = rows[r][c]
+            if not v:
+                continue
+            x0, y0 = (pad + c * cell) * S, (pad + r * cell) * S
+            d.rectangle([x0, y0, x0 + cell * S, y0 + cell * S],
+                        fill=_GREY if v == 2 else INK)
+    if grid:
+        for r in range(R + 1):
+            y = (pad + r * cell) * S
+            d.line([ax, y, bx, y], fill=_HAIR, width=_HW)
+        for c in range(C + 1):
+            x = (pad + c * cell) * S
+            d.line([x, ay, x, by], fill=_HAIR, width=_HW)
+    if frame:
+        d.rectangle([ax, ay, bx, by], outline=INK, width=_LW)
+    return _save(im, W, H, name)
+
+
+# ---- คลังรูปสัญลักษณ์ (พิกัดหน่วย ศูนย์กลางที่ (0,0) ครึ่งความกว้างสูงสุด = 1, แกน y ชี้ลงตามภาพ)
+def _norm(pts):
+    """ย่อ/ขยับให้กรอบรูปอยู่กึ่งกลาง (0,0) และครึ่งด้านที่ยาวที่สุดเท่ากับ 1 — ทุกรูปจึงมีน้ำหนักสายตาเท่ากัน"""
+    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+    cx, cy = (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
+    k = max(max(xs) - cx, max(ys) - cy) or 1.0
+    return [((x - cx) / k, (y - cy) / k) for x, y in pts]
+
+def _ngon(n, start=-90.0):
+    return [(math.cos(math.radians(start + i * 360.0 / n)),
+             math.sin(math.radians(start + i * 360.0 / n))) for i in range(n)]
+
+def _plus(t):
+    return [(-t,-1),(t,-1),(t,-t),(1,-t),(1,t),(t,t),(t,1),(-t,1),(-t,t),(-1,t),(-1,-t),(-t,-t)]
+
+def _star(n=5, inner=0.42, start=-90.0):
+    p = []
+    for i in range(n * 2):
+        rr = 1.0 if i % 2 == 0 else inner
+        a = math.radians(start + i * 180.0 / n)
+        p.append((rr * math.cos(a), rr * math.sin(a)))
+    return p
+
+def _rotpts(pts, deg):
+    """หมุนตามเข็มนาฬิกาบนภาพ (แกน y ชี้ลง)"""
+    a = math.radians(float(deg) % 360.0)
+    ca, sa = math.cos(a), math.sin(a)
+    return [(x * ca - y * sa, x * sa + y * ca) for x, y in pts]
+
+_ARROW = [(0,-1), (0.62,-0.08), (0.26,-0.08), (0.26,1), (-0.26,1), (-0.26,-0.08), (-0.62,-0.08)]
+
+SHAPES = {                      # rot=0 คือท่าตั้งต้น: ปลายแหลม/หัวลูกศรชี้ขึ้น
+    "square":   _norm([(-1,-1), (1,-1), (1,1), (-1,1)]),
+    "diamond":  _norm(_ngon(4)),
+    "triangle": _norm(_ngon(3)),
+    "pentagon": _norm(_ngon(5)),
+    "hexagon":  _norm(_ngon(6)),
+    "star":     _norm(_star()),
+    "cross":    _norm(_rotpts(_plus(0.20), 45)),   # กากบาท ×
+    "plus":     _norm(_plus(0.24)),                # เครื่องหมายบวก +
+    "arrow":    _norm(_ARROW),
+}
+_POS  = {"c": (.50, .50), "tl": (.28, .28), "tr": (.72, .28), "bl": (.28, .72), "br": (.72, .72)}
+_FILL = {"white": "white", "black": INK, "grey": _GREY, "gray": _GREY}
+
+def _sym(d, it, ox, oy, box):
+    """วาดสัญลักษณ์หนึ่งตัวลงบน d — ox, oy, box เป็นพิกัดที่คูณ S แล้ว"""
+    shape = str(it.get("shape", "circle")).lower()
+    posk  = str(it.get("pos", "c")).lower()
+    px, py = _POS.get(posk, _POS["c"])
+    frac  = float(it.get("size") or (0.55 if posk == "c" else 0.34))
+    fill  = _FILL.get(str(it.get("fill", "white")).lower(), "white")
+    rot   = it.get("rot", 0) or 0
+    cx, cy = ox + px * box, oy + py * box
+    r = max(_LW * 1.5, frac * box / 2.0)
+    if shape == "circle":       # หมุนแล้วเหมือนเดิม แต่ต้องไม่ error
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill, outline=INK, width=_LW)
+        return
+    if shape not in SHAPES:
+        raise ValueError("symbox: ไม่รู้จักรูป %r (มีให้ใช้: circle, %s)"
+                         % (shape, ", ".join(sorted(SHAPES))))
+    xy = [(cx + x * r, cy + y * r) for x, y in _rotpts(SHAPES[shape], rot)]
+    d.polygon(xy, fill=fill)
+    d.line(xy + [xy[0]], fill=INK, width=_LW, joint="curve")   # รูปโปร่งต้องมีเส้นขอบเข้มเสมอ
+
+def symbox(items, name, size=74, pad=6, frame=True):
+    """กรอบสี่เหลี่ยมหนึ่งกรอบ ข้างในมีสัญลักษณ์ 1-4 ตัว
+
+    items : list ของ dict แต่ละตัวคือสัญลักษณ์หนึ่งตัว คีย์ที่ต้องรองรับ
+        "shape" : "circle" | "square" | "triangle" | "diamond" | "star" | "cross" | "arrow"
+                  (ส่วนขยาย: "plus" · "pentagon" · "hexagon")
+        "fill"  : "white" | "black" | "grey"        (ค่าเริ่มต้น "white")
+        "pos"   : "c" | "tl" | "tr" | "bl" | "br"   (กลาง/มุมทั้งสี่ ค่าเริ่มต้น "c")
+        "rot"   : 0 | 90 | 180 | 270                 (ค่าเริ่มต้น 0 · หมุนตามเข็มนาฬิกา)
+        "size"  : 0.0-1.0 สัดส่วนต่อกรอบ             (ค่าเริ่มต้น 0.55 ถ้า pos="c" ไม่งั้น 0.34)
+    ใส่หลายตัวที่ pos เดียวกันแต่ size ต่างกันได้ = รูปซ้อนรูป (ตัวหลังทับตัวหน้า)
+    คืนค่า: ชื่อไฟล์ .png
+    """
+    W = H = size + pad * 2
+    im = Image.new("RGB", (W * S, H * S), "white"); d = ImageDraw.Draw(im)
+    ox = oy = pad * S
+    for it in (items or []):
+        _sym(d, it, ox, oy, size * S)
+    if frame:
+        d.rectangle([ox, oy, ox + size * S, oy + size * S], outline=INK, width=_LW)
+    return _save(im, W, H, name)
+
 # ---------------------------------------------------------------- รูปคลี่ลูกบาศก์
 NET = {(0,1):"A", (1,0):"B", (1,1):"C", (1,2):"D", (2,1):"E", (3,1):"F"}
 def net(labels, name, cell=40, pad=8):
@@ -312,3 +445,70 @@ def stars(n, name, size=26, gap=6, pad=2, total=3):
         else:
             d.polygon(pts, fill=(255, 255, 255), outline=STARCOL, width=max(1, int(S*0.9)))
     return _save(im, W, H, name)
+
+# ---------------------------------------------------------------- ตัวอย่างไว้ตรวจด้วยตา
+if __name__ == "__main__":
+    # รัน `python draw.py` แล้วเปิดไฟล์ img/zz*.png ดู — ไฟล์ขึ้นต้น zz คือของสาธิต ไม่ใช่รูปโจทย์
+    import random
+    rnd = random.Random(7)
+    out = []
+
+    # ---- plate: มีเส้น / ไม่มีเส้น / ตารางใหญ่ / ไม่มีกรอบ+มีโทนเทา
+    m = [[1 if (r + c) % 3 == 0 else 0 for c in range(5)] for r in range(5)]
+    out += [plate(m, "zzplate_grid", cell=20),
+            plate(m, "zzplate_nogrid", cell=20, grid=False),
+            plate([[0, 1, 0], [1, 2, 1], [0, 1, 0]], "zzplate_tone", cell=24, frame=False)]
+    strip(out, "zzsheet_plate", gap=22, lab=False)
+
+    # ---- plate ขนาดแผ่นบังแสงจริง 12x12 พร้อมผลซ้อน (AND ของรูทั้งสองแผ่น)
+    A = [[1 if rnd.random() < .55 else 0 for _ in range(12)] for _ in range(12)]
+    B = [[1 if rnd.random() < .55 else 0 for _ in range(12)] for _ in range(12)]
+    AND = [[1 if (A[r][c] or B[r][c]) else 0 for c in range(12)] for r in range(12)]
+    strip([plate(A, "zzmaskA", cell=13), plate(B, "zzmaskB", cell=13),
+           plate(AND, "zzmaskC", cell=13)], "zzsheet_mask", gap=26, lab=False)
+
+    # ---- symbox: ทุกรูป x ทุกการเติมสี
+    names = ["circle"] + sorted(SHAPES)
+    for fl in ("white", "grey", "black"):
+        strip([symbox([{"shape": s, "fill": fl}], "zzs_%s_%s" % (fl, s)) for s in names],
+              "zzsheet_fill_" + fl, gap=14, lab=False)
+
+    # ---- symbox: ทุกตำแหน่ง (เดี่ยว ๆ และรวมทั้งห้าตำแหน่งในกรอบเดียว)
+    ps = ["c", "tl", "tr", "bl", "br"]
+    cells = [symbox([{"shape": "square", "fill": "black", "pos": p}], "zzs_pos_" + p) for p in ps]
+    cells.append(symbox([{"shape": "circle", "fill": "grey", "size": .24},
+                         {"shape": "triangle", "pos": "tl"},
+                         {"shape": "cross", "fill": "black", "pos": "tr"},
+                         {"shape": "star", "fill": "black", "pos": "bl"},
+                         {"shape": "diamond", "fill": "white", "pos": "br"}], "zzs_pos_all"))
+    strip(cells, "zzsheet_pos", gap=14, lab=False)
+
+    # ---- symbox: หมุนครบสี่ค่า (star กับ arrow ต้องหมุนจริง · circle หมุนแล้วเหมือนเดิมแต่ต้องไม่ error)
+    for sh in ("star", "arrow", "triangle", "square", "circle"):
+        strip([symbox([{"shape": sh, "fill": "white", "rot": a}], "zzs_rot_%s_%d" % (sh, a))
+               for a in (0, 90, 180, 270)], "zzsheet_rot_" + sh, gap=14, lab=False)
+    # หมุนสัญลักษณ์สี่มุมพร้อมกัน = ไทล์อนุกรมแนว "ผังหมุน" (แต่ละไทล์คือไทล์ก่อนหน้าหมุน 90 องศา)
+    cn = ["tl", "tr", "br", "bl"]                       # เรียงตามเข็มนาฬิกา
+    sh4 = ["arrow", "star", "triangle", "square"]
+    strip([symbox([{"shape": sh4[k], "fill": "black", "pos": cn[(k + i) % 4], "rot": 90 * i}
+                   for k in range(4)], "zzs_rot4_%d" % i) for i in range(4)],
+          "zzsheet_rot_four", gap=14, lab=False)
+
+    # ---- symbox: รูปซ้อนรูปแบบช่องเมทริกซ์ 3x3 (รูปนอกใหญ่ + รูปในเล็ก)
+    outer = ["triangle", "square", "circle"]
+    inner = ["circle", "star", "diamond"]
+    tone  = ["white", "grey", "black"]
+    strip([symbox([{"shape": outer[r], "fill": "white", "size": .78},
+                   {"shape": inner[c], "fill": tone[(r + c) % 3], "size": .30}],
+                  "zzs_mx_%d%d" % (r, c), size=64)
+           for r in range(3) for c in range(3)], "zzsheet_matrix", gap=12, lab=False)
+
+    # ---- symbox: ไม่มีกรอบ (ตัวลวงในแนวเมทริกซ์) และรูปหลายตัวในกรอบเดียว
+    strip([symbox([{"shape": "hexagon", "fill": "grey"}], "zzs_nf1", frame=False),
+           symbox([{"shape": "plus", "fill": "black"}], "zzs_nf2", frame=False),
+           symbox([{"shape": "arrow", "fill": "white", "rot": 90}], "zzs_nf3", frame=False),
+           symbox([{"shape": "pentagon", "fill": "white", "size": .9},
+                   {"shape": "plus", "fill": "black", "size": .28}], "zzs_nf4")],
+          "zzsheet_noframe", gap=18, lab=False)
+
+    print("ตัวอย่างวาดเสร็จแล้ว — ดูไฟล์ img/zz*.png")
