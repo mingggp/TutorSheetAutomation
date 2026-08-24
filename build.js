@@ -12,6 +12,12 @@ const N   = parseInt(arg('n','50'),10);
 const SET = arg('set','1');
 const OUTF= arg('out','out.docx');
 
+// ของที่ต่างกันระหว่างวิชาอยู่ใน subjects.json ไฟล์เดียว เพิ่มวิชาใหม่ไม่ต้องแตะไฟล์นี้
+const SUBJ= arg('subject','tpat3');
+const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf8'))[SUBJ];
+if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
+const PMETA=Object.fromEntries(SUB.parts.map(p=>[p.key,p]));
+
 const PLAN={
   easy:{prio:[1,2,3], star:'star1.png'},
   std :{prio:[2,1,3], star:'star2.png'},
@@ -33,12 +39,12 @@ function pickPart(part,quota){
   return out.sort((a,b)=>a.q.lvl-b.q.lvl || a.i-b.i).map(o=>o.q);
 }
 const half=Math.round(N/2);
-const QS=[...pickPart('พาร์ทที่ 1',half),...pickPart('พาร์ทที่ 2',N-half)];
+const QS=[...pickPart(SUB.parts[0].key,half),...pickPart(SUB.parts[1].key,N-half)];
 const cnt=[1,2,3].map(lv=>QS.filter(q=>q.lvl===lv).length);
 
 // ---------- สไตล์ ----------
 const F="Sarabun";
-const TPAT3="D5004D", T1="00D5C9", T3="28A1AB";
+const SUBC=SUB.color, T1="00D5C9", T3="28A1AB";
 const INK="1F2528", MID="5B6669", SOFT="9AA5A8", HAIR="D3DADC";
 const CH="กขคงจ", BODY=27, USABLE=9638, MAXIMG=600, IND=580;
 
@@ -60,7 +66,7 @@ const COLTABS=[2480,4380,6280,8180].map(p=>({type:TabStopType.LEFT,position:p}))
 
 function questionKept(q,i){
   const out=[]; const push=(runs,o)=>out.push([runs,o]);
-  const gap = q.part==="พาร์ทที่ 1" ? 760 : 460;
+  const gap = (PMETA[q.part]||{}).gap ?? 460;
   q.stem.split("\n").forEach((ln,k)=>{
     push(k===0?[T(i+".",{bold:true,color:T3}),new TextRun({children:[new Tab()],font:F,size:BODY}),T(ln)]:[T(ln)],
       {before:k===0?gap:60,after:0,line:340,
@@ -84,23 +90,23 @@ function questionKept(q,i){
 }
 
 const kids=[];
-kids.push(P([T("TPAT3",{size:64,bold:true,color:TPAT3}),
-             T("   วีคคณิต ชุด "+SET+"   ",{size:28,bold:true,color:INK}),
+kids.push(P([T(SUB.name,{size:64,bold:true,color:SUBC}),
+             T("   "+SUB.series+SET+"   ",{size:28,bold:true,color:INK}),
              pic(PLAN.star,{scale:0.62}),
              new TextRun({children:[new Tab()],font:F,size:28}),
              pic("badge.png",{scale:0.62})],
             {after:150,line:0,tabStops:[{type:TabStopType.RIGHT,position:USABLE}]}));
-kids.push(P([pic("hdr_math.png")],{align:AlignmentType.CENTER,before:30,after:120,line:0}));
+kids.push(P([pic(SUB.flowImg+".png")],{align:AlignmentType.CENTER,before:30,after:120,line:0}));
 kids.push(P([T("")],{after:60,border:{bottom:{style:BorderStyle.SINGLE,size:8,color:T1,space:6}},line:200}));
 
 let part=null;
 QS.forEach((q,idx)=>{
   if(q.part!==part){
     part=q.part;
-    const isP1=part==="พาร์ทที่ 1";
+    const isP1=part===SUB.parts[0].key;
     if(!isP1) kids.push(new Paragraph({children:[new PageBreak()]}));
-    kids.push(P([T(part,{size:34,bold:true,color:TPAT3}),
-                 T("   ·   "+(isP1?"ความสามารถทางตัวเลข":"ความสามารถทางมิติสัมพันธ์"),{size:31,bold:true})],
+    kids.push(P([T(part,{size:34,bold:true,color:SUBC}),
+                 T("   ·   "+((PMETA[part]||{}).label||""),{size:31,bold:true})],
                 {before:isP1?280:0,after:30,keepNext:true}));
     kids.push(P([T("")],
                 {after:180,keepNext:true,line:120,
