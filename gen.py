@@ -521,6 +521,9 @@ G_NUM, G_SPA, G_REA = "ตอนที่ 2", "ตอนที่ 3", "ตอน
 import compare
 compare.build(add, G_NUM, random.Random(7100 + SEED * 104729), n=5, lvl=2)
 
+import solid
+_nsol = solid.build(add, G_SPA, random.Random(7200 + SEED * 104729), n_rot=5, n_odd=5, lvl=2)
+
 TG_BOXES = [("ภาษา", "20 ข้อ"), ("จำนวน", "20 ข้อ"),
             ("มิติสัมพันธ์", "20 ข้อ"), ("เหตุผล", "20 ข้อ")]
 TG_GROUPS = [("ไม่สอน", 0, 0), ("ที่สอน", 1, 3)]
