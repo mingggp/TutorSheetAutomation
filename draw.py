@@ -309,6 +309,28 @@ def strip(files, name, gap=26, labh=26, lab=True, labels=None):
         x += i2.width + gap
     return _save(im, W, h + (labh if lab else 0), name)
 
+def arrow(name, w=46, h=30):
+    """ลูกศรโปร่งชี้ขวา วาดเป็นรูป ไม่ใช้ตัวอักษร
+
+    ฟอนต์ Sarabun ไม่มีอักขระ → กับ │ ถ้าเอาไปใส่เป็นข้อความจะขึ้นเป็นกล่องว่าง
+    ข้อสอบจริงก็ใช้ลูกศรโปร่งที่วาดเองเหมือนกัน
+    """
+    im = Image.new("RGB", (w * S, h * S), "white"); d = ImageDraw.Draw(im)
+    X = lambda t: t * w * S
+    Y = lambda t: t * h * S
+    d.polygon([(X(0), Y(.32)), (X(.58), Y(.32)), (X(.58), Y(.06)),
+               (X(1), Y(.5)), (X(.58), Y(.94)), (X(.58), Y(.68)), (X(0), Y(.68))],
+              fill="white", outline=INK, width=max(1, S))
+    return _save(im, w, h, name)
+
+
+def divider(name, w=14, h=64):
+    """เส้นแบ่งแนวตั้ง ใช้คั่นกรอบตัวอย่างกับกรอบคำถาม"""
+    im = Image.new("RGB", (w * S, h * S), "white"); d = ImageDraw.Draw(im)
+    d.line([(w * S // 2, 0), (w * S // 2, h * S)], fill=LINEG, width=max(1, S))
+    return _save(im, w, h, name)
+
+
 def vstack(files, name, gap=10):
     """ต่อภาพในแนวตั้ง จัดกึ่งกลางแนวนอน — ใช้ประกอบเมทริกซ์รูปภาพจากแถวย่อย"""
     ims = [Image.open(os.path.join(IMG, f)) for f in files]
