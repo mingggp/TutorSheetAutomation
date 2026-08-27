@@ -13,6 +13,8 @@ const SET = arg('set','1');
 const OUTF= arg('out','out.docx');
 
 // ของที่ต่างกันระหว่างวิชาอยู่ใน subjects.json ไฟล์เดียว เพิ่มวิชาใหม่ไม่ต้องแตะไฟล์นี้
+const KEY = argv.includes('--key');          // ฉบับครู มีเฉลย
+const CAP = parseInt(arg('cap','2'),10);     // แนวเดียวกันได้ไม่เกินกี่ข้อต่อชีท (กติกาข้อ 5)
 const SUBJ= arg('subject','tpat3');
 const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf8'))[SUBJ];
 if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
@@ -27,13 +29,21 @@ if(!PLAN){console.error('mix ต้องเป็น easy | std | hard');proces
 
 function pickPart(part,quota){
   const idx=BANK.map((q,i)=>({q,i})).filter(o=>o.q.part===part);
-  const out=[];
-  for(const lv of PLAN.prio){
-    for(const o of idx){
+  const out=[], seen=new Set(), n={};
+  // เก็บทีละรอบ ค่อย ๆ ผ่อนเพดานจำนวนข้อต่อแนว
+  // รอบแรกจำกัดแนวละ CAP ข้อตามกติกาข้อ 5 ถ้าคลังไม่พอค่อยผ่อนทีละขั้น
+  // ผลคือชีทได้หลายแนวก่อนเสมอ แทนที่จะกวาดจากหัวคลังจนแนวแรกล้น
+  for(let cap=CAP; cap<=quota && out.length<quota; cap++){
+    for(const lv of PLAN.prio){
+      for(const o of idx){
+        if(out.length>=quota) break;
+        if(o.q.lvl!==lv || seen.has(o.i)) continue;
+        const a=o.q.arche;
+        if((n[a]||0)>=cap) continue;
+        out.push(o); seen.add(o.i); n[a]=(n[a]||0)+1;
+      }
       if(out.length>=quota) break;
-      if(o.q.lvl===lv && !out.includes(o)) out.push(o);
     }
-    if(out.length>=quota) break;
   }
   // เรียงจากง่ายไปยากภายในพาร์ท (ภายในระดับเดียวกันยังจัดกลุ่มตามแนวโจทย์)
   return out.sort((a,b)=>a.q.lvl-b.q.lvl || a.i-b.i).map(o=>o.q);
@@ -79,13 +89,19 @@ function questionKept(q,i){
   if(q.img)    push([pic(q.img,{scale:0.80})],{align:AlignmentType.CENTER,before:200,after:100,line:0});
   if(q.optimg) push([pic(q.optimg,{scale:0.92})],{align:AlignmentType.CENTER,before:130,after:120,line:0});
   else if(q.choices.some(c=>c.length>10) || q.choices.join("").length>44){
-    q.choices.forEach((c,k)=>push([T(CH[k]+"   ",{bold:true}),T(c)],
-      {before:80,after:80,indent:{left:IND+260,hanging:260}}));
+    q.choices.forEach((c,k)=>{
+      const hit = KEY && k===q.ansIdx;
+      push([T(CH[k]+"   ",{bold:true,color:hit?SUBC:undefined}),
+            T(c,{bold:hit||undefined,color:hit?SUBC:undefined})],
+        {before:80,after:80,indent:{left:IND+260,hanging:260}});
+    });
   } else {
     const runs=[];
     q.choices.forEach((c,k)=>{
       if(k) runs.push(new TextRun({children:[new Tab()],font:F,size:BODY}));
-      runs.push(T(CH[k]+"  ",{bold:true}),T(c));
+      const hit = KEY && k===q.ansIdx;
+      runs.push(T(CH[k]+"  ",{bold:true,color:hit?SUBC:undefined}),
+                T(c,{bold:hit||undefined,color:hit?SUBC:undefined}));
     });
     push(runs,{before:130,after:60,indent:{left:IND},tabStops:COLTABS});
   }
@@ -94,7 +110,7 @@ function questionKept(q,i){
 
 const kids=[];
 kids.push(P([T(SUB.name,{size:64,bold:true,color:SUBC}),
-             T("   "+SUB.series+SET+"   ",{size:28,bold:true,color:INK}),
+             T("   "+SUB.series+SET+(KEY?"  ·  ฉบับครู":"")+"   ",{size:28,bold:true,color:INK}),
              pic(PLAN.star,{scale:0.62}),
              new TextRun({children:[new Tab()],font:F,size:28}),
              pic("badge.png",{scale:0.62})],
@@ -117,6 +133,23 @@ QS.forEach((q,idx)=>{
   }
   questionKept(q,idx+1).forEach(x=>kids.push(x));
 });
+if(KEY){
+  // ตารางเฉลยรวมท้ายเล่ม — จำเป็นเพราะข้อที่ตัวเลือกเป็นรูป ระบายในตัวข้อไม่ได้
+  kids.push(new Paragraph({children:[new PageBreak()]}));
+  kids.push(P([T("เฉลยรวม",{size:40,bold:true,color:SUBC})],{after:60}));
+  kids.push(P([T(QS.length+" ข้อ   ·   ระบายสีในตัวข้อแล้วเฉพาะข้อที่ตัวเลือกเป็นตัวหนังสือ",
+                 {size:22,color:MID})],{after:220}));
+  const KTAB=[900,1800,2700,3600,4500,5400,6300,7200,8100].map(x=>({type:TabStopType.LEFT,position:x}));
+  for(let r=0;r<QS.length;r+=10){
+    const runs=[];
+    QS.slice(r,r+10).forEach((q,k)=>{
+      if(k) runs.push(new TextRun({children:[new Tab()],font:F,size:BODY}));
+      runs.push(T((r+k+1)+". ",{size:23,color:MID}),
+                T(CH[q.ansIdx].replace(/[.)]/,""),{size:26,bold:true,color:T3}));
+    });
+    kids.push(P(runs,{before:60,after:60,tabStops:KTAB}));
+  }
+}
 kids.push(P([T("")],{before:520,after:0,line:120,
              border:{bottom:{style:BorderStyle.SINGLE,size:4,color:HAIR,space:2}}}));
 kids.push(P([T("End of Exercise",{size:21,color:SOFT})],{before:120,align:AlignmentType.CENTER}));

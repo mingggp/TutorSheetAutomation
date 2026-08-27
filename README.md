@@ -50,18 +50,32 @@ python gen.py
 ## ใช้งานประจำวัน — ออกชีท
 
 ```powershell
-make.bat easy 50 1     REM  ★☆☆  50 ข้อ  ชุดที่ 1
-make.bat std  50 2     REM  ★★☆
-make.bat hard 50 3     REM  ★★★
+make.bat std 20 1      REM  ★★☆  20 ข้อ  ชุดที่ 1
+make.bat easy 20 1     REM  ★☆☆  ปูพื้น
+make.bat hard 20 1     REM  ★★★  เข้มข้น
+make.bat std 20 1 0 tgat2   REM  วิชา TGAT2
 ```
 
-ไฟล์ออกมาที่โฟลเดอร์ `out\`
+**คำสั่งเดียวได้ครบ 4 ไฟล์** — ชีทนักเรียน .docx/.pdf และฉบับครูมีเฉลย .docx/.pdf
+ออกมาที่โฟลเดอร์ `out\`
+
+แปลง PDF ใช้ **Microsoft Word** ที่มีในเครื่อง (ไม่ต้องลง LibreOffice)
+ถ้าอยากแปลงเองทีหลัง: `powershell -ExecutionPolicy Bypass -File topdf.ps1 out\*.docx`
 
 หรือสั่งเองทีละขั้น:
 ```powershell
 python gen.py
-node build.js --mix hard --n 40 --set 5 --out out\ชุด5.docx
+node build.js --mix hard --n 20 --set 5 --out out\ชุด5.docx
+node build.js --mix hard --n 20 --set 5 --key --out out\ชุด5-ครู.docx
 ```
+
+**ธงที่ใช้ได้กับ `build.js`**
+
+| ธง | ความหมาย |
+|---|---|
+| `--key` | ฉบับครู — ระบายสีตัวเลือกที่ถูก + ตารางเฉลยรวมท้ายเล่ม |
+| `--cap N` | แนวเดียวกันได้ไม่เกิน N ข้อต่อชีท (ค่าเริ่มต้น 2 ตามกติกาข้อ 5) |
+| `--subject` | วิชา ดูรายชื่อใน `subjects.json` |
 
 ---
 
@@ -166,6 +180,7 @@ Remove-Item .claude\dash\activity.jsonl
 | `compare.py` | เครื่องผลิตโจทย์เปรียบเทียบเชิงปริมาณของ TGAT2 พร้อมตัวตรวจในตัว |
 | `solid.py` | เครื่องผลิตโจทย์ทรงสามมิติของ TGAT2 (หมุนภาพ · หาภาพต่าง) ต่อยอดจาก cube.py |
 | `readqr.py` | อ่าน QR "สแกนดูเฉลย" จาก PDF ใน reference/ |
+| `topdf.ps1` | แปลง .docx เป็น .pdf ด้วย Word ที่ติดตั้งในเครื่อง |
 | `reference/` | ข้อสอบจริงไว้ศึกษาแนว — **ห้ามลอก ดูได้แค่แนว** |
 | `reference/tpat3/DIGEST-part2.md` | สรุปแนวพาร์ท 2 จากข้อสอบจริง 60 ข้อ — อ่านไฟล์นี้แทนการเปิด PDF |
 | `img/` | รูปที่ถูกวาดออกมา (สร้างใหม่อัตโนมัติ ลบทิ้งได้) |

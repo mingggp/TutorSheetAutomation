@@ -109,7 +109,7 @@
   "ansIdx": 2,
   "img": "mx1.png",
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -189,7 +189,7 @@
   "ansIdx": 1,
   "img": "trq2.png",
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -205,7 +205,7 @@
   "ansIdx": 0,
   "img": null,
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -301,7 +301,7 @@
   "ansIdx": 1,
   "img": null,
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -317,7 +317,7 @@
   "ansIdx": 0,
   "img": null,
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -349,7 +349,7 @@
   "ansIdx": 1,
   "img": null,
   "optimg": null,
-  "lvl": 2
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -813,7 +813,7 @@
   "ansIdx": 3,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 2
  },
  {
   "part": "พาร์ทที่ 1",
@@ -829,7 +829,7 @@
   "ansIdx": 0,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -845,7 +845,7 @@
   "ansIdx": 1,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 2
  },
  {
   "part": "พาร์ทที่ 1",
@@ -861,7 +861,7 @@
   "ansIdx": 1,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -877,7 +877,7 @@
   "ansIdx": 3,
   "img": "hmx1.png",
   "optimg": null,
-  "lvl": 3
+  "lvl": 2
  },
  {
   "part": "พาร์ทที่ 1",
@@ -893,7 +893,7 @@
   "ansIdx": 0,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -941,7 +941,7 @@
   "ansIdx": 2,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 2
  },
  {
   "part": "พาร์ทที่ 1",
@@ -1005,7 +1005,7 @@
   "ansIdx": 3,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -1021,7 +1021,7 @@
   "ansIdx": 0,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 1",
@@ -1037,7 +1037,7 @@
   "ansIdx": 2,
   "img": null,
   "optimg": null,
-  "lvl": 3
+  "lvl": 1
  },
  {
   "part": "พาร์ทที่ 2",
