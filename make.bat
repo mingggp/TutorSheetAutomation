@@ -43,9 +43,12 @@ echo [3/4] ประกอบฉบับครู ...
 node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --key --out "%KEY%.docx"
 if errorlevel 1 goto err
 
-echo [4/4] แปลงเป็น PDF ...
+echo [4/5] แปลงเป็น PDF ...
 powershell -ExecutionPolicy Bypass -File topdf.ps1 "%STU%.docx" "%KEY%.docx"
 del "%STU%.docx" "%KEY%.docx" 2>nul
+
+echo [5/5] ทำรูปให้คม (Word บีบรูปเหลือ 200 dpi ตอน export) ...
+python sharpen.py "%STU%.pdf" "%KEY%.pdf"
 
 echo.
 echo เสร็จแล้ว  ->  %DIR%

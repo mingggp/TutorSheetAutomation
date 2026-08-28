@@ -132,7 +132,7 @@ kids.push(P([T(SUB.name,{size:64,bold:true,color:SUBC}),
              new TextRun({children:[new Tab()],font:F,size:28}),
              pic("badge.png",{scale:0.62,hi:3})],
             {after:150,line:0,tabStops:[{type:TabStopType.RIGHT,position:USABLE}]}));
-kids.push(P([pic(SUB.flowImg+".png")],{align:AlignmentType.CENTER,before:30,after:120,line:0}));
+kids.push(P([pic(SUB.flowImg+".png",{hi:3})],{align:AlignmentType.CENTER,before:30,after:120,line:0}));
 kids.push(P([T("")],{after:60,border:{bottom:{style:BorderStyle.SINGLE,size:8,color:T1,space:6}},line:200}));
 
 let part=null;

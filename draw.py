@@ -18,6 +18,9 @@ LINEG = (150, 162, 165)
 S = 3
 HI = 3        # รูปเล็กที่ต้องคมตอนพิมพ์ (โลโก้ ดาว ชิป) เก็บที่ความละเอียด HI เท่า
 
+SAVED = {}     # ชื่อรูป -> จำนวนครั้งที่ถูกเขียน ใช้ดักชื่อชนกันระหว่างเครื่องผลิตคนละตัว
+
+
 def _save(im, W, H, name, hi=1):
     """hi = เก็บไฟล์ที่ความละเอียดกี่เท่าของขนาดที่จะแสดงจริง
 
@@ -25,6 +28,7 @@ def _save(im, W, H, name, hi=1):
     ขอบตัวอักษรจะฟุ้ง ต้องเก็บ 3 เท่าแล้วให้ build.js ย่อลงตอนวาง (ธง hi ใน pic())
     """
     im = im.resize((W * hi, H * hi), Image.LANCZOS)
+    SAVED[name] = SAVED.get(name, 0) + 1
     p = os.path.join(IMG, name + ".png"); im.save(p)
     return name + ".png"
 
@@ -421,7 +425,7 @@ def header(active, name, bw=172, bh=74, gapin=14, gapout=38, pad=6,
         d.line([x1, yb - 4*S, x1, yb], fill=col, width=max(1, int(1.4*S)))
         tw = d.textlength(gname, font=fgrp)
         d.text(((x0 + x1)/2 - tw/2, yb + 3*S), gname, font=fgrp, fill=col)
-    return _save(im, W, H, name)
+    return _save(im, W, H, name, hi=HI)
 
 
 # ---------------------------------------------------------------- badge (gradient)

@@ -114,8 +114,9 @@ addnum(P1, "หน่วยและการประมาณค่า",
        "ถังทรงกระบอกรัศมี 50 เซนติเมตร สูง 1 เมตร บรรจุน้ำได้เต็มถังพอดี จะบรรจุน้ำได้ประมาณกี่ลิตร (ใช้ π ≈ 3.14)", 785, 60)
 # unseen (1)
 setlv(1)
-addnum(P1, "unseen",
-       "กระดาษแผ่นหนึ่งพับครึ่งซ้ำกัน 8 ครั้ง เมื่อพับเสร็จกระดาษจะซ้อนกันกี่ชั้น", 256, 32)
+# ตัวเลือกต้องเป็นกำลังของ 2 ทั้งห้า ไม่งั้นเด็กตัดตัวเลือกที่ไม่ใช่ 2^n ทิ้งแล้วตอบได้เลย
+add(P1, "unseen", "กระดาษแผ่นหนึ่งพับครึ่งซ้ำกัน 8 ครั้ง เมื่อพับเสร็จกระดาษจะซ้อนกันกี่ชั้น",
+    ["64", "128", "256", "512", "1024"], 2)
 
 n1 = sum(1 for q in QS if q["part"] == P1)
 assert n1 == 25, n1
@@ -487,7 +488,9 @@ for qi, (N, a, c, kind) in enumerate(ANA, 1):
     ia = D.grid(N, N, filled=a, name=f"an{qi}a"); ib = D.grid(N, N, filled=b, name=f"an{qi}b")
     ic = D.grid(N, N, filled=c, name=f"an{qi}c")
     iq = D.grid(N, N, filled=set(), name=f"an{qi}q", center="?")
-    stem = D.compose([ia, ib, ic, iq], f"an{qi}stem", seps=[":", "::", ":"], gap=16)
+    # กลางกรอบใช้เส้นแบ่งแนวตั้งที่วาดเป็นรูป ไม่ใช่ "::" ซึ่งอ่านแล้วสับสนคอนเซปต์
+    dv = D.divider(f"an{qi}dv", h=54)
+    stem = D.compose([ia, ib, dv, ic, iq], f"an{qi}stem", seps=[":", "", "", ":"], gap=16)
     allc = {(r, cc) for r in range(N) for cc in range(N)}
     vs = [correct]
     while len(vs) < 5:
@@ -543,6 +546,15 @@ for _n in (1, 2, 3): D.stars(_n, f"star{_n}")
 
 from collections import Counter
 stems = Counter(q["stem"] for q in QS)
+# ---------- ด่านกันชื่อรูปชนกัน ----------
+# เครื่องผลิตคนละตัวเคยใช้ชื่อไฟล์เดียวกันโดยไม่รู้ตัว (an1o0.png ของ
+# "แผนภาพอุปมาอุปมัย" เดิม ชนกับ "อุปมาอุปไมยรูปภาพ" ตัวใหม่)
+# ตัวหลังเขียนทับตัวแรก ทำให้โจทย์กับตัวเลือกมาจากคนละข้อ และไม่มีอะไรฟ้องเลย
+_dup = {k: v for k, v in D.SAVED.items() if v > 1}
+if _dup:
+    raise SystemExit("ชื่อรูปชนกัน (เครื่องผลิตคนละตัวเขียนทับกัน): " +
+                     ", ".join(f"{k} x{v}" for k, v in sorted(_dup.items())))
+
 print("โจทย์ที่ข้อความซ้ำ:", {k[:28]: v for k, v in stems.items() if v > 1})
 print("แนวโจทย์:", len({q["arche"] for q in QS}), "| ตำแหน่งคำตอบ:", dict(sorted(Counter(q["ansIdx"] for q in QS).items())))
 with open(os.path.join(OUT, "questions.json"), "w", encoding="utf-8") as _f:

@@ -513,7 +513,7 @@ def build(add, P2, rng):
 
     for qi in range(3):                       # ★★★ อุปมาอุปไมยรูปภาพ
         A, B, Cc, opts, idx = analogy(rng, want=want)
-        img, optimg = render_analogy(A, B, Cc, opts, f"an{qi}")
+        img, optimg = render_analogy(A, B, Cc, opts, f"pana{qi}")
         add(P2, "อุปมาอุปไมยรูปภาพ", ANALOGY_STEM, [""] * 5, idx,
             img=img, optimg=optimg, lvl=3)
         want = (want + 2) % 5
