@@ -96,7 +96,15 @@ function questionKept(q,i){
        tabStops:[{type:TabStopType.LEFT,position:IND}]});
   });
   if(q.img)    push([pic(q.img,{scale:0.80})],{align:AlignmentType.CENTER,before:200,after:100,line:0});
-  if(q.optimg) push([pic(q.optimg,{scale:0.92})],{align:AlignmentType.CENTER,before:130,after:120,line:0});
+  if(q.optimg){
+    push([pic(q.optimg,{scale:0.92})],{align:AlignmentType.CENTER,before:130,after:40,line:0});
+    // ตัวเลือกเป็นรูป ระบายสีในตัวเลือกไม่ได้ ต้องพิมพ์เฉลยกำกับใต้แถบรูปแทน
+    // ไม่งั้นครูต้องพลิกไปดูตารางท้ายเล่มถึงครึ่งชีท (21 จาก 50 ข้อเป็นแบบนี้)
+    if(KEY) push([T("เฉลย  ",{size:22,color:MID}),
+                  T(CH[q.ansIdx],{size:30,bold:true,color:SUBC})],
+                 {align:AlignmentType.CENTER,before:0,after:110});
+    else push([T("")],{after:80,line:0});
+  }
   else if(q.choices.some(c=>c.length>10) || q.choices.join("").length>44){
     q.choices.forEach((c,k)=>{
       const hit = KEY && k===q.ansIdx;
