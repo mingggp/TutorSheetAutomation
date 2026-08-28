@@ -195,6 +195,111 @@ def series(rng, want=0, n=5, steps=3, hard=False):
 
 
 # ============================================================
+#  แนวเพิ่มจากรายงาน digest — ข้อสอบจริงออกรวมกัน 17% แต่คลังเคยมี 0 ข้อ
+#
+#  ภาพสะท้อนกระจก (5%) · หารูปไม่เข้าพวก (5%) · อุปมาอุปไมยรูปภาพ (7%)
+#  ทั้งสามใช้เครื่องวาด plate() ที่มีอยู่แล้ว ไม่ต้องเขียนเครื่องวาดใหม่
+# ============================================================
+
+MIRROR_STEM = "ภาพด้านบนเมื่อสะท้อนกับกระจกที่วางในแนวตั้งทางขวามือ จะได้ภาพในข้อใด"
+ODDG_STEM = "ภาพในข้อใด**ไม่เข้าพวก**กับภาพอื่น"
+ANALOGY_STEM = ("ทางซ้ายของเส้นแบ่ง ภาพแรกเปลี่ยนเป็นภาพที่สองด้วยกฎอย่างหนึ่ง\n"
+                "ถ้าใช้กฎเดียวกันกับภาพทางขวาของเส้นแบ่ง จะได้ภาพในข้อใด")
+
+
+def rot180(g):
+    return rot90(rot90(g))
+
+
+def rot270(g):
+    return rot90(rot180(g))
+
+
+def _rots4(g):
+    return [g, rot90(g), rot180(g), rot270(g)]
+
+
+def mirror(rng, want=0, n=5):
+    """ภาพสะท้อนกระจก — คำตอบคือ flip_h ของภาพต้นแบบ
+
+    กันกรณีที่สะท้อนแล้วได้ผลเหมือนการหมุน ไม่งั้นตัวลวงที่เป็นภาพหมุนจะถูกด้วย
+    """
+    for _ in range(500):
+        A = _rand_grid(rng, n, 0.28, 0.44)
+        truth = flip_h(A)
+        if truth in _rots4(A):          # ภาพนี้สะท้อนแล้วเหมือนหมุน โจทย์จะมีคำตอบซ้ำ
+            continue
+        pool = [g for g in _rots4(A) if g != truth]
+        pool += [flip_v(A), perturb(truth, rng, 1), perturb(truth, rng, 2)]
+        rng.shuffle(pool)
+        wrong = _pick5(truth, pool, rng)
+        if wrong is None:
+            continue
+        opts, idx = _place([truth] + wrong, truth, want)
+        if sum(1 for o in opts if o == truth) != 1:
+            continue
+        return A, opts, idx
+    raise RuntimeError("สร้างโจทย์ภาพสะท้อนกระจกไม่สำเร็จ")
+
+
+def oddgrid(rng, want=0, n=5):
+    """หารูปไม่เข้าพวก — สี่ภาพเป็นภาพเดียวกันที่หมุนไป มีภาพเดียวที่ต่างออกไป"""
+    for _ in range(500):
+        P = _rand_grid(rng, n, 0.28, 0.44)
+        fam = []
+        for g in _rots4(P):
+            if g not in fam:
+                fam.append(g)
+        if len(fam) != 4:               # ภาพสมมาตร หมุนแล้วซ้ำ ใช้ไม่ได้
+            continue
+        Q = perturb(P, rng, 2)
+        if any(Q == g for g in _rots4(Q)[1:]) or Q in fam:
+            continue
+        if any(Q in _rots4(g) for g in fam):
+            continue
+        opts, idx = _place([Q] + fam, Q, want)
+        if len(set(opts)) != 5:
+            continue
+        # ต้องมีภาพเดียวที่ไม่ใช่สมาชิกของตระกูล
+        if sum(1 for o in opts if o not in fam) != 1:
+            continue
+        return opts, idx
+    raise RuntimeError("สร้างโจทย์หารูปไม่เข้าพวกไม่สำเร็จ")
+
+
+def analogy(rng, want=0, n=5):
+    """A→B สอนกฎ · C→? ให้ใช้กฎเดียวกัน — กฎต้องถอดได้แบบเดียวเท่านั้น"""
+    names = SIMPLE + COMPOUND
+    for _ in range(500):
+        rule = rng.choice(names)
+        step = RULES[rule]
+        A = _rand_grid(rng, n, 0.25, 0.42)
+        B = step(A)
+        if B == A:
+            continue
+        # ต้องมีกฎเดียวที่พา A ไป B ได้ ไม่งั้นถอดกฎได้หลายแบบ
+        fits = [r for r in RULES if RULES[r](A) == B]
+        if len(fits) != 1:
+            continue
+        C = _rand_grid(rng, n, 0.25, 0.42)
+        if C == A:
+            continue
+        truth = step(C)
+        pool = [RULES[r](C) for r in RULES if r != rule]
+        pool += [C, perturb(truth, rng, 1), perturb(truth, rng, 2)]
+        pool = [g for g in pool if g != truth]
+        rng.shuffle(pool)
+        wrong = _pick5(truth, pool, rng)
+        if wrong is None:
+            continue
+        opts, idx = _place([truth] + wrong, truth, want)
+        if sum(1 for o in opts if o == truth) != 1:
+            continue
+        return A, B, C, opts, idx
+    raise RuntimeError("สร้างโจทย์อุปมาอุปไมยรูปภาพไม่สำเร็จ")
+
+
+# ============================================================
 #  เมทริกซ์รูปภาพ 3×3 ช่องขวาล่างหาย — ของจริงออก 10% ของพาร์ท 2
 #
 #  ทุกคุณลักษณะเดินเป็นจตุรัสละติน: ในหนึ่งแถวและหนึ่งหลัก
@@ -319,6 +424,32 @@ def render_series(frames, opts, tag, cell=15):
     return stem, D.strip(files, tag + "opt")
 
 
+def render_mirror(A, opts, tag, cell=17):
+    import draw as D
+    stem = D.plate(A, tag + "s", cell=cell + 3)
+    files = [D.plate(o, f"{tag}o{i}", cell=cell) for i, o in enumerate(opts)]
+    return stem, D.strip(files, tag + "opt")
+
+
+def render_oddgrid(opts, tag, cell=17):
+    import draw as D
+    files = [D.plate(o, f"{tag}o{i}", cell=cell) for i, o in enumerate(opts)]
+    return D.strip(files, tag + "opt")
+
+
+def render_analogy(A, B, Cc, opts, tag, cell=17):
+    """A → B │ C → ?  — ลูกศรกับเส้นแบ่งวาดเป็นรูป เพราะฟอนต์ไม่มีอักขระพวกนี้"""
+    import draw as D
+    a = D.plate(A, tag + "a", cell=cell)
+    b = D.plate(B, tag + "b", cell=cell)
+    c = D.plate(Cc, tag + "c", cell=cell)
+    q = D.grid(1, 1, name=tag + "q", cell=cell * 5, pad=3, center="?")
+    stem = D.compose([a, D.arrow(tag + "r1"), b, D.divider(tag + "dv"),
+                      c, D.arrow(tag + "r2"), q], tag + "s", gap=10)
+    files = [D.plate(o, f"{tag}o{i}", cell=cell - 2) for i, o in enumerate(opts)]
+    return stem, D.strip(files, tag + "opt")
+
+
 def build(add, P2, rng):
     """เติมโจทย์สองแนวนี้เข้าคลัง — เรียกจาก gen.py
 
@@ -364,6 +495,26 @@ def build(add, P2, rng):
         cells, opts, idx = matrix(rng, want=want, attrs=3)
         img, optimg = render_matrix(cells, opts, f"mh{qi}")
         add(P2, "เมทริกซ์รูปภาพ", MATRIX_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=3)
+        want = (want + 2) % 5
+
+    for qi in range(3):                       # ★★☆ ภาพสะท้อนกระจก
+        A, opts, idx = mirror(rng, want=want)
+        img, optimg = render_mirror(A, opts, f"mr{qi}")
+        add(P2, "ภาพสะท้อนกระจก", MIRROR_STEM, [""] * 5, idx,
+            img=img, optimg=optimg, lvl=2)
+        want = (want + 2) % 5
+
+    for qi in range(3):                       # ★★☆ หารูปไม่เข้าพวก
+        opts, idx = oddgrid(rng, want=want)
+        add(P2, "หารูปไม่เข้าพวก", ODDG_STEM, [""] * 5, idx,
+            optimg=render_oddgrid(opts, f"og{qi}"), lvl=2)
+        want = (want + 2) % 5
+
+    for qi in range(3):                       # ★★★ อุปมาอุปไมยรูปภาพ
+        A, B, Cc, opts, idx = analogy(rng, want=want)
+        img, optimg = render_analogy(A, B, Cc, opts, f"an{qi}")
+        add(P2, "อุปมาอุปไมยรูปภาพ", ANALOGY_STEM, [""] * 5, idx,
             img=img, optimg=optimg, lvl=3)
         want = (want + 2) % 5
 

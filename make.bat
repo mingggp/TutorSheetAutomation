@@ -1,40 +1,54 @@
 @echo off
 chcp 65001 >nul
-setlocal
-REM  ออกชีทครบชุด: นักเรียน + ครู + แปลง PDF
+setlocal EnableDelayedExpansion
+REM  ออกชีทครบชุด: นักเรียน + ครู เป็น PDF
 REM  make.bat [easy^|std^|hard] [จำนวนข้อ] [เลขชุด] [seed] [วิชา]
-REM  ตัวอย่าง: make.bat std 20 1
-REM           make.bat std 20 1 0 tgat2
 set MIX=%~1
 set NUM=%~2
 set SETNO=%~3
 set SD=%~4
 set SUBJ=%~5
 if "%MIX%"==""   set MIX=std
-if "%NUM%"==""   set NUM=20
+if "%NUM%"==""   set NUM=50
 if "%SETNO%"=="" set SETNO=1
 if "%SD%"==""    set SD=0
 if "%SUBJ%"==""  set SUBJ=tpat3
 set TPAT_SEED=%SD%
-set BASE=out\%SUBJ%_%MIX%_%SETNO%
+
+REM  easy/std/hard -> Beginner/Medium/Advanced
+if "%MIX%"=="easy" set LV=Beginner
+if "%MIX%"=="std"  set LV=Medium
+if "%MIX%"=="hard" set LV=Advanced
+if "%LV%"=="" (echo mix ต้องเป็น easy ^| std ^| hard & goto end)
+
+REM  ชื่อวิชาตัวใหญ่
+set UP=%SUBJ%
+if "%SUBJ%"=="tpat3" set UP=TPAT3
+if "%SUBJ%"=="tgat2" set UP=TGAT2
+
+set DIR=out\%UP% %LV%
+set STU=%DIR%\[%UP%] %LV%
+set KEY=%DIR%\[%UP%] %LV% Key
+if not exist "%DIR%" mkdir "%DIR%"
 
 echo [1/4] สร้างคลังโจทย์ ...
 python gen.py
 if errorlevel 1 goto err
 
 echo [2/4] ประกอบชีทนักเรียน ...
-node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --out "%BASE%_นักเรียน.docx"
+node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --out "%STU%.docx"
 if errorlevel 1 goto err
 
-echo [3/4] ประกอบฉบับครู (มีเฉลย) ...
-node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --key --out "%BASE%_ครู.docx"
+echo [3/4] ประกอบฉบับครู ...
+node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --key --out "%KEY%.docx"
 if errorlevel 1 goto err
 
-echo [4/4] แปลงเป็น PDF ด้วย Word ...
-powershell -ExecutionPolicy Bypass -File topdf.ps1 "%BASE%_นักเรียน.docx" "%BASE%_ครู.docx"
+echo [4/4] แปลงเป็น PDF ...
+powershell -ExecutionPolicy Bypass -File topdf.ps1 "%STU%.docx" "%KEY%.docx"
+del "%STU%.docx" "%KEY%.docx" 2>nul
 
 echo.
-echo เสร็จแล้ว ดูในโฟลเดอร์ out
+echo เสร็จแล้ว  ->  %DIR%
 goto end
 
 :err

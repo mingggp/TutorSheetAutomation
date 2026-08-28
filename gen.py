@@ -512,6 +512,10 @@ hard.build(add, addnum, P1, P2)
 import spatial
 spatial.build(add, P2, random.Random(5300 + SEED * 104729))
 
+# แนวพาร์ทตัวเลขที่ข้อสอบจริงออกแต่คลังเคยมี 0 ข้อ (ดูรายงาน calibrator ช่องโหว่ 3-8)
+import numeric
+numeric.build(add, P1, random.Random(6100 + SEED * 104729))
+
 # ==================================================================
 # TGAT2 — เอาเฉพาะ 3 ท่อนหลัง ติวเตอร์ไม่สอนตอนที่ 1 (ความสามารถทางภาษา)
 # ผังข้อสอบพิมพ์อยู่ในตัวข้อสอบเอง ดู reference/tgat2/DIGEST.md

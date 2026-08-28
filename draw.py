@@ -16,9 +16,15 @@ LEFTF = (176, 202, 204)
 RIGHTF= (201, 221, 222)
 LINEG = (150, 162, 165)
 S = 3
+HI = 3        # รูปเล็กที่ต้องคมตอนพิมพ์ (โลโก้ ดาว ชิป) เก็บที่ความละเอียด HI เท่า
 
-def _save(im, W, H, name):
-    im = im.resize((W, H), Image.LANCZOS)
+def _save(im, W, H, name, hi=1):
+    """hi = เก็บไฟล์ที่ความละเอียดกี่เท่าของขนาดที่จะแสดงจริง
+
+    รูปเล็ก ๆ อย่างโลโก้กับดาว ถ้าเก็บเท่าขนาดแสดงจะได้แค่ ~155 dpi ตอนพิมพ์
+    ขอบตัวอักษรจะฟุ้ง ต้องเก็บ 3 เท่าแล้วให้ build.js ย่อลงตอนวาง (ธง hi ใน pic())
+    """
+    im = im.resize((W * hi, H * hi), Image.LANCZOS)
     p = os.path.join(IMG, name + ".png"); im.save(p)
     return name + ".png"
 
@@ -434,7 +440,7 @@ def badge(text, name, padx=16, pady=7, fs=19):
             a, b, u = GRAD[1], GRAD[2], (t-.5)*2
         d.line([x, 0, x, H*S], fill=tuple(int(a[i] + (b[i]-a[i])*u) for i in range(3)))
     d.text(((W*S - tw*S)/2, pady*S*0.55), text, font=f, fill=(255, 255, 255))
-    return _save(im, W, H, name)
+    return _save(im, W, H, name, hi=HI)
 
 
 # ------------------------------------------------- รูปคลี่รูปทรงอิสระ (ไม่ใช่แค่กากบาท)
@@ -466,7 +472,7 @@ def levelchip(text, lv, name, padx=14, pady=6, fs=17):
     col = LVCOL[lv]
     d.rectangle([0, 0, W*S-1, H*S-1], fill=col)
     d.text(((W*S - tw*S)/2, pady*S*0.55), text, font=f, fill=(255, 255, 255))
-    return _save(im, W, H, name)
+    return _save(im, W, H, name, hi=HI)
 
 
 # ---------------------------------------------------------------- ดาวระดับความยาก
@@ -489,7 +495,7 @@ def stars(n, name, size=26, gap=6, pad=2, total=3):
             d.polygon(pts, fill=STARCOL)
         else:
             d.polygon(pts, fill=(255, 255, 255), outline=STARCOL, width=max(1, int(S*0.9)))
-    return _save(im, W, H, name)
+    return _save(im, W, H, name, hi=HI)
 
 # ---------------------------------------------------------------- ตัวอย่างไว้ตรวจด้วยตา
 if __name__ == "__main__":

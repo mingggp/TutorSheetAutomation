@@ -69,10 +69,12 @@ const P=(runs,o={})=>new Paragraph({
   border:o.border,tabStops:o.tabStops,
   children:Array.isArray(runs)?runs:[T(runs,o)]});
 
-function pic(file,{scale=1}={}){
+// hi = ไฟล์นี้ถูกเก็บที่ความละเอียดกี่เท่าของขนาดที่จะแสดง (ดู draw._save)
+// รูปเล็กอย่างโลโก้กับดาวเก็บ 3 เท่าเพื่อให้คมตอนพิมพ์ ต้องหารกลับตอนวาง
+function pic(file,{scale=1,hi=1}={}){
   const buf=fs.readFileSync(path.join(__dirname,'img',file));
   const w=buf.readUInt32BE(16), h=buf.readUInt32BE(20);
-  const s=scale*Math.min(1,MAXIMG/w);
+  const s=scale*Math.min(1,MAXIMG/(w/hi))/hi;
   return new ImageRun({type:"png",data:buf,transformation:{width:Math.round(w*s),height:Math.round(h*s)}});
 }
 const COLTABS=[2480,4380,6280,8180].map(p=>({type:TabStopType.LEFT,position:p}));
@@ -80,8 +82,15 @@ const COLTABS=[2480,4380,6280,8180].map(p=>({type:TabStopType.LEFT,position:p}))
 function questionKept(q,i){
   const out=[]; const push=(runs,o)=>out.push([runs,o]);
   const gap = (PMETA[q.part]||{}).gap ?? 460;
-  q.stem.split("\n").forEach((ln,k)=>{
-    push(k===0?[T(i+".",{bold:true,color:T3}),new TextRun({children:[new Tab()],font:F,size:BODY}),T(ln)]:[T(ln)],
+  // **ข้อความ** ในโจทย์ = ตัวหนา ใช้เน้นคำปฏิเสธอย่าง "ไม่ใช่" กับ "เป็นไปไม่ได้"
+  // ซึ่งเด็กอ่านข้ามบ่อยที่สุด ถ้าไม่รองรับ ดอกจันจะพิมพ์ออกมาในชีทจริง
+  const segs = ln => ln.split("**").map((t,j)=>[t, j%2===1]).filter(([t])=>t!=="");
+  q.stem.split(/\r?\n/).forEach((ln,k)=>{
+    const runs = k===0
+      ? [T(i+".",{bold:true,color:T3}),new TextRun({children:[new Tab()],font:F,size:BODY})]
+      : [];
+    segs(ln).forEach(([t,b])=>runs.push(T(t,{bold:b||undefined})));
+    push(runs,
       {before:k===0?gap:60,after:0,line:340,
        indent:{left:IND,hanging:k===0?IND:0},
        tabStops:[{type:TabStopType.LEFT,position:IND}]});
@@ -111,9 +120,9 @@ function questionKept(q,i){
 const kids=[];
 kids.push(P([T(SUB.name,{size:64,bold:true,color:SUBC}),
              T("   "+SUB.series+SET+(KEY?"  ·  ฉบับครู":"")+"   ",{size:28,bold:true,color:INK}),
-             pic(PLAN.star,{scale:0.62}),
+             pic(PLAN.star,{scale:0.62,hi:3}),
              new TextRun({children:[new Tab()],font:F,size:28}),
-             pic("badge.png",{scale:0.62})],
+             pic("badge.png",{scale:0.62,hi:3})],
             {after:150,line:0,tabStops:[{type:TabStopType.RIGHT,position:USABLE}]}));
 kids.push(P([pic(SUB.flowImg+".png")],{align:AlignmentType.CENTER,before:30,after:120,line:0}));
 kids.push(P([T("")],{after:60,border:{bottom:{style:BorderStyle.SINGLE,size:8,color:T1,space:6}},line:200}));
@@ -150,9 +159,12 @@ if(KEY){
     kids.push(P(runs,{before:60,after:60,tabStops:KTAB}));
   }
 }
-kids.push(P([T("")],{before:520,after:0,line:120,
-             border:{bottom:{style:BorderStyle.SINGLE,size:4,color:HAIR,space:2}}}));
-kids.push(P([T("End of Exercise",{size:21,color:SOFT})],{before:120,align:AlignmentType.CENTER}));
+// เส้นกับข้อความอยู่บรรทัดเดียวกัน — ใช้ em dash เพราะ Sarabun ไม่มีอักขระ box-drawing
+const DASH = "—".repeat(13);
+kids.push(P([T(DASH+"  ",{size:21,color:HAIR}),
+             T("End of Exercise",{size:21,color:SOFT}),
+             T("  "+DASH,{size:21,color:HAIR})],
+            {before:560,align:AlignmentType.CENTER}));
 
 const doc=new Document({
   styles:{default:{document:{run:{font:F,size:BODY,color:INK}}},
