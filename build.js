@@ -53,6 +53,12 @@ function pickPart(part,quota){
 const NP=SUB.parts.length;
 const quota=SUB.parts.map((_,i)=>Math.floor(N/NP)+(i<N%NP?1:0));
 const QS=SUB.parts.flatMap((p,i)=>pickPart(p.key,quota[i]));
+// --list = พิมพ์รายการข้อที่เลือกแล้วออก ใช้ตอนไล่บั๊กว่า "ข้อ 38" คือแนวไหน
+if(argv.includes('--list')){
+  QS.forEach((q,i)=>console.log(String(i+1).padStart(3)+"  "+q.part+"  ลว."+q.lvl+"  "+q.arche
+    +"  "+(q.img||"-")+"  "+(q.optimg||"-")+"\n     "+q.stem.split(/\r?\n/)[0].slice(0,70)));
+  process.exit(0);
+}
 const cnt=[1,2,3].map(lv=>QS.filter(q=>q.lvl===lv).length);
 
 // ---------- สไตล์ ----------

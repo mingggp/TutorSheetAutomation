@@ -12,7 +12,7 @@ ExportAsFixedFormat แบบเน้นงานพิมพ์ก็ตาม
 
     python sharpen.py "out/.../[TPAT3] Medium.pdf" [...]
 """
-import sys, os, io
+import sys, os, io, json
 
 try:
     import pymupdf
@@ -35,10 +35,21 @@ def _diff(a, b):
 
 
 def load_sources():
-    """โหลดรูปต้นฉบับทั้งหมดใน img/ พร้อม thumbnail ไว้เทียบ"""
+    """โหลดเฉพาะรูปที่ตั้งใจเก็บความละเอียดสูง พร้อม thumbnail ไว้เทียบ
+
+    **ห้ามโหลดทุกไฟล์ใน img/** เพราะการเดาจับคู่ด้วยภาพย่อไม่แม่นพอ
+    แถบตัวเลือกของคนละข้อหน้าตาคล้ายกันมาก เคยสลับทับกันจนข้อ 34 แสดงตัวเลือกของข้ออื่น
+    รายชื่อมาจาก img/_hires.json ที่ gen.py เขียนไว้ (รูปที่ _save เก็บด้วย hi > 1)
+    """
+    manifest = os.path.join(IMG, "_hires.json")
+    if not os.path.exists(manifest):
+        print("    ไม่เจอ img/_hires.json — ข้ามขั้นทำรูปให้คม (รัน gen.py ก่อน)")
+        return []
+    with open(manifest, encoding="utf-8") as fh:
+        allow = {n + ".png" for n in json.load(fh)}
     out = []
     for f in os.listdir(IMG):
-        if not f.endswith(".png"):
+        if f not in allow:
             continue
         p = os.path.join(IMG, f)
         try:
@@ -49,7 +60,7 @@ def load_sources():
     return out
 
 
-def sharpen(path, sources, tol=14.0):
+def sharpen(path, sources, tol=10.0):
     doc = pymupdf.open(path)
     swapped = 0
     seen = set()
@@ -68,7 +79,7 @@ def sharpen(path, sources, tol=14.0):
             ct = _thumb(cur)
             ratio = cur.width / max(1, cur.height)
 
-            best, bestd = None, 1e9
+            best, bestd, second = None, 1e9, 1e9
             for p, (w, h), th in sources:
                 if abs((w / max(1, h)) - ratio) > 0.06 * ratio:
                     continue            # อัตราส่วนต่างกันมาก ไม่ใช่รูปเดียวกันแน่
@@ -76,8 +87,11 @@ def sharpen(path, sources, tol=14.0):
                     continue            # ต้นฉบับไม่ได้ละเอียดกว่า ไม่ต้องสลับ
                 d = _diff(ct, th)
                 if d < bestd:
-                    best, bestd = p, d
-            if best and bestd <= tol:
+                    best, bestd, second = p, d, bestd
+                elif d < second:
+                    second = d
+            # ต้องชนะอันดับสองขาดลอย ไม่งั้นแปลว่าเดาไม่ขาด อย่าเสี่ยงสลับ
+            if best and bestd <= tol and second - bestd >= 4.0:
                 try:
                     page.replace_image(xref, filename=best)   # เป็นเมธอดของ Page ไม่ใช่ Document
                     swapped += 1

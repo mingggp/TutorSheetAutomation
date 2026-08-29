@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ตัววาดรูปทั้งหมดสำหรับชีท TPAT3"""
-import os
+import os, hashlib
 from PIL import Image, ImageDraw, ImageFont
 
 IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img")
@@ -19,6 +19,9 @@ S = 3
 HI = 3        # รูปเล็กที่ต้องคมตอนพิมพ์ (โลโก้ ดาว ชิป) เก็บที่ความละเอียด HI เท่า
 
 SAVED = {}     # ชื่อรูป -> จำนวนครั้งที่ถูกเขียน ใช้ดักชื่อชนกันระหว่างเครื่องผลิตคนละตัว
+HASH  = {}     # ชื่อรูป -> ภาพย่อขาวดำ 64x64 ใช้ดักตัวเลือกที่ซ้ำกับโจทย์
+STRIPS = {}    # ชื่อแถบตัวเลือก -> ไฟล์ที่เอามาต่อกัน ใช้ย้อนดูว่าตัวเลือกไหนคือรูปอะไร
+HIRES = {}     # ชื่อรูป -> เก็บที่ความละเอียดกี่เท่า (sharpen.py แตะได้เฉพาะที่ > 1)
 
 
 def _save(im, W, H, name, hi=1):
@@ -29,6 +32,12 @@ def _save(im, W, H, name, hi=1):
     """
     im = im.resize((W * hi, H * hi), Image.LANCZOS)
     SAVED[name] = SAVED.get(name, 0) + 1
+    HIRES[name] = hi
+    # ย่อเป็นขาวดำ 64x64 ก่อนทำลายนิ้วมือ รูปเดียวกันคนละขนาดจะได้ค่าตรงกัน
+    # เก็บเป็นภาพย่อ ไม่ใช่ค่าแฮช เพราะโจทย์กับตัวเลือกมักวาดคนละขนาด
+    # (rt3stem วาด cell=26 ส่วนตัวเลือก cell=22) ค่าแฮชจึงไม่ตรงกันทั้งที่เป็นรูปเดียวกัน
+    HASH[name] = (W * hi, H * hi,
+                  im.convert("L").resize((64, 64), Image.LANCZOS).tobytes())
     p = os.path.join(IMG, name + ".png"); im.save(p)
     return name + ".png"
 
@@ -45,6 +54,28 @@ def _iso_geom(vox, cell, ch, pad):
     W, H = int(mxx - mnx) + pad * 2, int(mxy - mny) + pad * 2
     return proj, W, H, -mnx + pad, -mny + pad
 
+# มุมทั้งสี่ของหน้าที่มองเห็น เรียงเป็น (ซ้ายบน, ขวาบน, ขวาล่าง, ซ้ายล่าง) แบบตัวอักษรตั้งตรง
+_CORNERS = {
+    "top":   [(0,0,1), (1,0,1), (1,1,1), (0,1,1)],
+    "left":  [(0,1,1), (1,1,1), (1,1,0), (0,1,0)],
+    "right": [(1,1,1), (1,0,1), (1,0,0), (1,1,0)],
+}
+
+def _order_quad(corners, rt, dn):
+    """เรียงมุมใหม่ตามแกนของกระดาษ (rt = ขวามือของกระดาษ, dn = ด้านล่างของกระดาษ)
+
+    ส่งลำดับนี้เข้า _glyph_on_quad แล้วตัวอักษรจะไปวางตะแคงตรงกับที่พับมาจริง
+
+    ที่ต้องกลับทิศ rt เพราะสองไฟล์นับมือคนละข้าง — cube.frames_of ใช้กติกา
+    n = dn x rt (ด้านที่พิมพ์ตัวอักษรคือด้านที่ normal ชี้ออก) ส่วนการวางมุมชุดนี้
+    ใช้ n = rt x dn ถ้าไม่กลับ ตัวอักษรจะออกมากลับด้านเหมือนส่องกระจก
+    ซึ่งการพับกระดาษจริงทำไม่ได้ (ตรวจด้วยตาแล้วที่ลูกบาศก์ A-C: ขอบล่างของ A ต้องชนขอบบนของ C)
+    """
+    rt = (-rt[0], -rt[1], -rt[2])
+    dot = lambda p, v: p[0]*v[0] + p[1]*v[1] + p[2]*v[2]
+    s = sorted(corners, key=lambda p: (dot(p, dn), dot(p, rt)))
+    return [s[0], s[1], s[3], s[2]]
+
 def iso(vox, name, cell=26, ch=22, pad=12, labels=None):
     """labels = (top, left, right) ตัวอักษรบนหน้าที่มองเห็น (ใช้กับลูกบาศก์ก้อนเดียว)"""
     vox = sorted(set(vox))
@@ -56,14 +87,14 @@ def iso(vox, name, cell=26, ch=22, pad=12, labels=None):
         d.polygon([P(x,y+1,z+1),P(x+1,y+1,z+1),P(x+1,y+1,z),P(x,y+1,z)], fill=LEFTF, outline=INK, width=S)
         d.polygon([P(x+1,y,z+1),P(x+1,y+1,z+1),P(x+1,y+1,z),P(x+1,y,z)], fill=RIGHTF,outline=INK, width=S)
     if labels:
-        quads = {
-            "top":   [P(0,0,1), P(1,0,1), P(1,1,1), P(0,1,1)],
-            "left":  [P(0,1,1), P(1,1,1), P(1,1,0), P(0,1,0)],
-            "right": [P(1,1,1), P(1,0,1), P(1,0,0), P(1,1,0)],
-        }
-        for key, txt in zip(("top", "left", "right"), labels):
-            if not txt: continue
-            im.paste(*_glyph_on_quad(txt, quads[key]))
+        for key, lab in zip(("top", "left", "right"), labels):
+            if not lab: continue
+            if isinstance(lab, str):
+                txt, corn = lab, _CORNERS[key]          # ตั้งตรงตามค่าเริ่มต้น
+            else:
+                txt, rt, dn = lab                       # ตะแคงตามที่กระดาษพับมาจริง
+                corn = _order_quad(_CORNERS[key], rt, dn)
+            im.paste(*_glyph_on_quad(txt, [P(*c) for c in corn]))
     return _save(im, W, H, name)
 
 def _find_coeffs(dst, src):
@@ -306,6 +337,7 @@ def strip(files, name, gap=26, labh=26, lab=True, labels=None):
     """labels = ป้ายหน้าตัวเลือกเอง เช่น ["1)","2)",...] สำหรับ TGAT2
     ไม่ใส่ = ใช้ ก. ข. ค. ง. จ. ตามสไตล์เดิม"""
     ims = [Image.open(os.path.join(IMG, f)) for f in files]
+    STRIPS[name] = list(files)
     h = max(i.height for i in ims)
     W = sum(i.width for i in ims) + gap * (len(ims) - 1)
     im = Image.new("RGB", (W*S, (h + (labh if lab else 0))*S), "white")

@@ -44,6 +44,11 @@ def flip_v(g):
     return tuple(reversed(g))
 
 
+def flip_d(g):
+    """สะท้อนกับแนวทแยงจากมุมบนซ้ายไปมุมล่างขวา"""
+    return tuple(tuple(g[c][r] for c in range(len(g))) for r in range(len(g[0])))
+
+
 def shift(g, dr, dc):
     """เลื่อนแบบวนขอบ"""
     R, C = len(g), len(g[0])
@@ -219,18 +224,32 @@ def _rots4(g):
     return [g, rot90(g), rot180(g), rot270(g)]
 
 
-def mirror(rng, want=0, n=5):
-    """ภาพสะท้อนกระจก — คำตอบคือ flip_h ของภาพต้นแบบ
+AXES = {
+    "h": (flip_h, "กระจกที่วางในแนวตั้งทางขวามือ"),
+    "v": (flip_v, "กระจกที่วางในแนวนอนด้านล่าง"),
+    "d": (flip_d, "กระจกที่วางในแนวทแยงจากมุมบนซ้ายไปมุมล่างขวา"),
+}
+
+
+def mirror(rng, want=0, n=5, axis="h"):
+    """ภาพสะท้อนกระจก — คำตอบคือภาพต้นแบบที่สะท้อนกับแกนที่โจทย์บอก
+
+    แกนกระจกเปลี่ยนได้ (ขวามือ / ด้านล่าง / แนวทแยง) เพราะถ้าทุกข้อสะท้อนขวามือเหมือนกันหมด
+    ข้อหลัง ๆ ก็ไม่ได้วัดอะไรเพิ่ม เด็กจำท่าเดียวก็ตอบได้ทั้งชุด (ติวเตอร์ทักที่ข้อ 47/48)
 
     กันกรณีที่สะท้อนแล้วได้ผลเหมือนการหมุน ไม่งั้นตัวลวงที่เป็นภาพหมุนจะถูกด้วย
     """
+    fn, _ = AXES[axis]
     for _ in range(500):
         A = _rand_grid(rng, n, 0.28, 0.44)
-        truth = flip_h(A)
+        truth = fn(A)
         if truth in _rots4(A):          # ภาพนี้สะท้อนแล้วเหมือนหมุน โจทย์จะมีคำตอบซ้ำ
             continue
         pool = [g for g in _rots4(A) if g != truth]
-        pool += [flip_v(A), perturb(truth, rng, 1), perturb(truth, rng, 2)]
+        # เอาการสะท้อนแกนอื่นมาเป็นตัวลวงด้วย เพราะเป็นคำตอบที่คนสะท้อนผิดแกนจะเลือก
+        pool += [f(A) for k, (f, _t) in AXES.items() if k != axis]
+        pool += [perturb(truth, rng, 1), perturb(truth, rng, 2)]
+        pool = [g for g in pool if g != truth]
         rng.shuffle(pool)
         wrong = _pick5(truth, pool, rng)
         if wrong is None:
@@ -319,11 +338,15 @@ def _latin(vals, r, c, a, b):
     return vals[(a * r + b * c) % 3]
 
 
-def matrix(rng, want=0, attrs=2):
+def matrix(rng, want=0, attrs=2, hole=(2, 2)):
     """attrs=2 → รูปทรง + การเติมสี (★★☆) · attrs=3 → เพิ่มการหมุนอีกชั้น (★★★)
 
+    hole = ช่องที่หาย ปกติคือขวาล่าง (2,2) ตามข้อสอบจริงส่วนใหญ่
+    ถ้าย้ายไปกลางตาราง (1,1) จะยากขึ้นจริง เพราะต่อแถวสุดท้ายตรง ๆ ไม่ได้
+    ต้องอ่านทั้งแถวและทั้งหลักพร้อมกัน (ใช้ทำให้ข้อหลังยากกว่าข้อหน้าในระดับดาวเดียวกัน)
+
     คืน (cells, choices, ansIdx) โดย cells เป็นตาราง 3×3 ของ (shape, fill, rot)
-    ช่อง (2,2) คือช่องที่ต้องเดา — ตัวเรียกต้องวาดเป็น "?" แทน
+    ตัวเรียกต้องวาดช่อง hole เป็น "?" แทน
     """
     for _ in range(400):
         pool = M_ROTSHAPES if attrs == 3 else M_SHAPES
@@ -337,7 +360,7 @@ def matrix(rng, want=0, attrs=2):
                     _latin(rt, r, c, 2, 1) if attrs == 3 else 0)
 
         cells = [[cell(r, c) for c in range(3)] for r in range(3)]
-        truth = cells[2][2]
+        truth = cells[hole[0]][hole[1]]
 
         cand = [(s, f, t) for s in sh for f in fl for t in (rt if attrs == 3 else [0])]
         rng.shuffle(cand)
@@ -352,14 +375,15 @@ def matrix(rng, want=0, attrs=2):
     raise RuntimeError("สร้างโจทย์เมทริกซ์รูปภาพไม่สำเร็จ")
 
 
-def forced(cells, k):
-    """ค่าที่ช่อง (2,2) ถูกบังคับให้เป็น เมื่อดูจากคุณลักษณะที่ k ของอีก 8 ช่อง
+def forced(cells, k, hole=(2, 2)):
+    """ค่าที่ช่อง hole ถูกบังคับให้เป็น เมื่อดูจากคุณลักษณะที่ k ของอีก 8 ช่อง
 
     คืน None ถ้าแถวกับหลักบังคับไม่ตรงกัน หรือบังคับไม่ได้ — แปลว่าโจทย์ใช้ไม่ได้
     """
-    row = [cells[2][c][k] for c in range(2)]
-    col = [cells[r][2][k] for r in range(2)]
-    allv = {cells[r][c][k] for r in range(3) for c in range(3) if (r, c) != (2, 2)}
+    hr, hc = hole
+    row = [cells[hr][c][k] for c in range(3) if c != hc]
+    col = [cells[r][hc][k] for r in range(3) if r != hr]
+    allv = {cells[r][c][k] for r in range(3) for c in range(3) if (r, c) != hole}
     from_row = [v for v in allv if v not in row]
     from_col = [v for v in allv if v not in col]
     if len(from_row) != 1 or len(from_col) != 1 or from_row[0] != from_col[0]:
@@ -387,13 +411,13 @@ def _cellimg(spec, name):
     return D.symbox([{"shape": s, "fill": f, "rot": t}], name)
 
 
-def render_matrix(cells, opts, tag):
+def render_matrix(cells, opts, tag, hole=(2, 2)):
     import draw as D
     rows = []
     for r in range(3):
         imgs = []
         for c in range(3):
-            if (r, c) == (2, 2):
+            if (r, c) == hole:
                 # ขนาดต้องเท่า symbox พอดี: size 74 + pad 6 สองข้าง = 86
                 imgs.append(D.grid(1, 1, name=f"{tag}qm", cell=74, pad=6, center="?"))
             else:
@@ -484,9 +508,11 @@ def build(add, P2, rng):
         img=img, optimg=optimg, lvl=3)
     want = (want + 2) % 5
 
-    for qi in range(2):                       # ★★☆ เมทริกซ์ สองคุณลักษณะ
-        cells, opts, idx = matrix(rng, want=want, attrs=2)
-        img, optimg = render_matrix(cells, opts, f"mx{qi}")
+    # ข้อแรกช่องหายอยู่ขวาล่างตามของจริง ข้อหลังย้ายไปกลางตารางให้ยากขึ้น
+    # (ติวเตอร์ทักว่าข้อ 45 กับ 46 ยากเท่ากัน ข้อหลังจึงไม่ได้วัดอะไรเพิ่ม)
+    for qi, hole in enumerate(((2, 2), (1, 1))):   # ★★☆ เมทริกซ์ สองคุณลักษณะ
+        cells, opts, idx = matrix(rng, want=want, attrs=2, hole=hole)
+        img, optimg = render_matrix(cells, opts, f"mx{qi}", hole=hole)
         add(P2, "เมทริกซ์รูปภาพ", MATRIX_STEM, [""] * 5, idx,
             img=img, optimg=optimg, lvl=2)
         want = (want + 2) % 5
@@ -498,11 +524,12 @@ def build(add, P2, rng):
             img=img, optimg=optimg, lvl=3)
         want = (want + 2) % 5
 
-    for qi in range(3):                       # ★★☆ ภาพสะท้อนกระจก
-        A, opts, idx = mirror(rng, want=want)
+    for qi, ax in enumerate(("h", "v", "d")):  # ★★☆ ภาพสะท้อนกระจก แกนละข้อ
+        A, opts, idx = mirror(rng, want=want, axis=ax)
         img, optimg = render_mirror(A, opts, f"mr{qi}")
-        add(P2, "ภาพสะท้อนกระจก", MIRROR_STEM, [""] * 5, idx,
-            img=img, optimg=optimg, lvl=2)
+        add(P2, "ภาพสะท้อนกระจก",
+            f"ภาพด้านบนเมื่อสะท้อนกับ{AXES[ax][1]} จะได้ภาพในข้อใด",
+            [""] * 5, idx, img=img, optimg=optimg, lvl=2 if ax != "d" else 3)
         want = (want + 2) % 5
 
     for qi in range(3):                       # ★★☆ หารูปไม่เข้าพวก
@@ -558,9 +585,9 @@ if __name__ == "__main__":
                 check(step(frames[i]) == frames[i + 1],
                       f"series s={s} hard={hard}: ภาพที่ {i+2} ไม่ได้มาจากกฎ")
 
-    for attrs in (2, 3):
-        cells, opts, idx = matrix(rng, want=want, attrs=attrs)
-        truth = cells[2][2]
+    for attrs, hole in ((2, (2, 2)), (2, (1, 1)), (3, (2, 2))):
+        cells, opts, idx = matrix(rng, want=want, attrs=attrs, hole=hole)
+        truth = cells[hole[0]][hole[1]]
         check(len(set(opts)) == 5, f"matrix s={s} attrs={attrs}: ตัวเลือกซ้ำกัน")
         check(idx == want, f"matrix s={s} attrs={attrs}: บังคับตำแหน่งเฉลยไม่ได้")
         check(opts[idx] == truth, f"matrix s={s} attrs={attrs}: เฉลยไม่ใช่ช่องที่หาย")
@@ -568,7 +595,7 @@ if __name__ == "__main__":
               f"matrix s={s} attrs={attrs}: มีคำตอบถูกเกินหนึ่ง")
         # หัวใจ: ผู้สอบต้องอนุมานได้จริงจาก 8 ช่องที่เห็น ไม่ใช่ถูกเพราะคนออกบอกว่าถูก
         for k in range(3 if attrs == 3 else 2):
-            check(forced(cells, k) == truth[k],
+            check(forced(cells, k, hole) == truth[k],
                   f"matrix s={s} attrs={attrs}: คุณลักษณะที่ {k} อนุมานจากแถว/หลักไม่ได้")
         # ทุกแถวและทุกหลักต้องมีค่าครบสามค่า ไม่ซ้ำไม่ขาด
         for k in range(3 if attrs == 3 else 2):

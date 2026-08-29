@@ -98,7 +98,10 @@ addnum(P1, "โจทย์ปัญหาคณิต",
 # เชาวน์ปัญญา (2)
 setlv(2)
 addnum(P1, "เชาวน์ปัญญา",
-       "ท่อนไม้ยาว 10 เมตร ต้องการตัดออกเป็นท่อนย่อยยาวท่อนละ 2 เมตร จะต้องตัดทั้งหมดกี่ครั้ง", 4, 1, lvl=1)
+       "ท่อนไม้ยาว 12 เมตร ตัดออกเป็นท่อนย่อยยาวท่อนละ 2 เมตร\n"
+       "การตัดหนึ่งครั้งใช้เวลา 4 นาที และต้องพัก 2 นาทีระหว่างการตัดแต่ละครั้ง\n"
+       "ตั้งแต่เริ่มตัดครั้งแรกจนตัดครั้งสุดท้ายเสร็จ ใช้เวลาทั้งหมดกี่นาที",
+       (12 // 2 - 1) * 4 + (12 // 2 - 2) * 2, 1, lvl=2)
 addnum(P1, "เชาวน์ปัญญา",
        "ในห้องประชุมมีคน 8 คน ทุกคนจับมือทักทายกันครบทุกคู่ คู่ละหนึ่งครั้ง จะมีการจับมือทั้งหมดกี่ครั้ง", 28, 4, lvl=1)
 
@@ -150,9 +153,19 @@ addnum(P2, "Block Counting", "กองลูกบาศก์นี้สร�
 
 # ---------- helper ภาพฉาย ----------
 def cols_of(hm, kind):
+    """ภาพฉายของกองลูกบาศก์ — กติกาการจัดวางอ้างการเขียนแบบ
+
+    ในภาพ isometric แกน x พุ่งไปทางขวาล่าง แกน y พุ่งไปทางซ้ายล่าง
+    แถวที่ y มากที่สุดจึงเป็นแถว "หน้า" ที่อยู่ใกล้คนดูที่สุด
+
+    ด้านหน้า  มองจากซ้ายล่าง  เรียง x ซ้ายไปขวาตามที่เห็นในภาพ
+    ด้านขวา   มองจากขวาล่าง   **ขอบหน้าของทรงต้องอยู่ซ้ายมือของภาพ** จึงต้องไล่ y จากมากไปน้อย
+              (เดิมไล่ y จาก 0 ขึ้นไป = เอาด้านหลังไว้ซ้าย ซึ่งกลับข้าง — ติวเตอร์จับได้จากข้อ 30/31)
+    ด้านบน    มองจากบน ขอบหน้าอยู่ล่างสุด จึงใช้ (y, x) ตรง ๆ
+    """
     ny, nx = len(hm), len(hm[0])
     if kind == "front": return [max(hm[y][x] for y in range(ny)) for x in range(nx)]
-    return [max(hm[y][x] for x in range(nx)) for y in range(ny)]
+    return [max(hm[y][x] for x in range(nx)) for y in range(ny - 1, -1, -1)]
 def cells_of(cols, mh): return {(mh-1-h, c) for c, v in enumerate(cols) for h in range(v)}
 def top_cells(hm): return {(r,c) for r in range(len(hm)) for c in range(len(hm[0])) if hm[r][c] > 0}
 def views(hm): return (tuple(cols_of(hm,"front")), tuple(cols_of(hm,"side")), tuple(sorted(top_cells(hm))))
@@ -160,7 +173,7 @@ def views(hm): return (tuple(cols_of(hm,"front")), tuple(cols_of(hm,"side")), tu
 # ---------- ภาพฉาย : ทรง → ภาพ (3) ----------
 setlv(1)
 ORTHO = [([[3,1,2],[2,1,1]], "front", "ด้านหน้า"),
-         ([[2,3,1],[1,2,1],[1,1,1]], "side", "ด้านข้าง"),
+         ([[2,3,1],[1,2,1],[1,1,1]], "side", "ด้านขวา"),
          ([[3,2,2],[2,2,0],[1,0,0]], "top", "ด้านบน")]
 for qi, (hm, kind, thai) in enumerate(ORTHO, 1):
     rng = random.Random(500 + qi + SEED * 104729)
@@ -197,7 +210,7 @@ for qi, (hm, mode) in enumerate(ISOQ, 1):
     sv = D.grid(mh, len(hm), filled=cells_of(cols_of(hm,"side"), mh), name=f"iv{qi}s", cell=28)
     tv = D.grid(len(hm), len(hm[0]), filled=top_cells(hm), name=f"iv{qi}t", cell=28)
     stem = D.compose([fv, sv, tv], f"iv{qi}stem", seps=["",""], gap=30,
-                     capt=["ด้านหน้า","ด้านข้าง","ด้านบน"])
+                     capt=["ด้านหน้า","ด้านขวา","ด้านบน"])
     if mode == "count":
         addnum(P2, "ISOMETRIC",
                "ทรงที่ตรงกับภาพฉายทั้งสามด้านนี้ สร้างจากลูกบาศก์หน่วยอย่างน้อยที่สุดกี่ก้อน",
@@ -276,6 +289,56 @@ def triples(labels):
     base = {NETDIR[k]: v for k, v in labels.items()}
     return {(lambda f: (f[UP], f[BK], f[RT]))({R(d): l for d, l in base.items()}) for R in ROTS}
 
+# ทิศของกระดาษบนแต่ละหน้า อ่านจากรูปคลี่ที่วาดจริง (draw.NET) ไม่ใช่เขียนค่าตายตัวไว้
+# จึงเปลี่ยนรูปคลี่เมื่อไหร่ ตัวเลขก็ตะแคงตามเองโดยไม่ต้องแก้ตรงนี้
+import cube as _CU
+_NF = _CU.frames_of(set(D.NET))
+assert _NF is not None, "รูปคลี่ใน draw.NET พับเป็นลูกบาศก์ไม่ได้"
+NETFRAME = {D.NET[c]: _NF[c] for c in D.NET}
+assert all(_CU.NEG(NETFRAME[k][0]) == NETFRAME[OPP[k]][0] for k in NETFRAME),     "ตาราง OPP ไม่ตรงกับรูปคลี่ที่วาดจริง"
+
+def _no_mirror_check():
+    """พิสูจน์ว่าไม่มีมุมมองไหนที่ตัวอักษรออกมากลับด้าน — การพับกระดาษจริงทำแบบนั้นไม่ได้
+
+    วัดจากทิศการวนมุมบนจอ ถ้าวนกลับทาง แปลว่า _glyph_on_quad จะพลิกตัวอักษร
+    ครอบทั้ง 24 มุมหมุน x 3 หน้าที่มองเห็น = 72 กรณี
+    """
+    cell, ch = 26, 22
+    pj = lambda x, y, z: ((x - y) * cell, (x + y) * (cell // 2) - z * ch)
+    base = {NETFRAME[k][0]: (k, NETFRAME[k][1], NETFRAME[k][2]) for k in NETFRAME}
+    for R in ROTS:
+        f = {R(n): (l, R(rt), R(dn)) for n, (l, rt, dn) in base.items()}
+        for key, nrm in (("top", UP), ("left", BK), ("right", RT)):
+            _l, rt, dn = f[nrm]
+            UL, UR, LR, LL = [pj(*c) for c in D._order_quad(D._CORNERS[key], rt, dn)]
+            ax, ay = UR[0] - UL[0], UR[1] - UL[1]
+            bx, by = LL[0] - UL[0], LL[1] - UL[1]
+            assert ax * by - ay * bx > 0, f"ตัวอักษรกลับด้านที่หน้า {key}"
+_no_mirror_check()
+
+def oriented(labels):
+    """เหมือน triples() แต่พก "ทิศของตัวอักษร" มาด้วย
+
+    ตัวอักษรบนหน้าลูกบาศก์ตะแคงได้ 4 แบบ ลูกบาศก์ที่เลข 3 ตั้งตรงกับที่เลข 3 ตะแคง
+    จึงเป็นคนละภาพ ไม่ใช่ภาพเดียวกัน ถ้าไม่คิดตรงนี้ โจทย์พับกล่องจะมีคำตอบถูกหลายข้อ
+    โดยที่ตัวตรวจไม่รู้ตัว (ติวเตอร์จับได้ที่ข้อ 33 และทำให้ข้อ 34 อ่านแล้วขัดใจ)
+
+    คืน set ของ ((ตัวอักษรบน, rt, dn), (ซ้าย, rt, dn), (ขวา, rt, dn)) ครบทั้ง 24 มุมมอง
+    """
+    base = {NETFRAME[k][0]: (v, NETFRAME[k][1], NETFRAME[k][2]) for k, v in labels.items()}
+    out = set()
+    for R in ROTS:
+        f = {R(n): (lab, R(rt), R(dn)) for n, (lab, rt, dn) in base.items()}
+        out.add((f[UP], f[BK], f[RT]))
+    return out
+
+def relabel(view, letters3):
+    """เปลี่ยนตัวอักษรบนสามหน้าที่เห็น โดยคงทิศการตะแคงไว้เหมือนเดิม
+
+    ตัวลวงต้องตะแคงเหมือนตัวถูก ไม่งั้นเด็กจับได้ทันทีว่าข้อไหนคือเฉลย
+    """
+    return tuple((letters3[i], view[i][1], view[i][2]) for i in range(3))
+
 def opposite_of(labels, x):
     inv = {v: k for k, v in labels.items()}
     return labels[OPP[inv[x]]]
@@ -284,15 +347,19 @@ def opposite_of(labels, x):
 setlv(2)
 lab1 = {"A":"P","B":"Q","C":"R","D":"S","E":"T","F":"U"}
 rng = random.Random(801 + SEED * 104729)
-good = sorted(triples(lab1)); correct = rng.choice(good)
+goodo = sorted(oriented(lab1)); goodset = set(goodo)
+correct = rng.choice(goodo)
 letters = sorted(lab1.values())
-bad = [t for t in itertools.permutations(letters, 3) if t not in set(good)]
+bad = [relabel(correct, t) for t in itertools.permutations(letters, 3)]
+bad = [v for v in bad if v not in goodset]
 rng.shuffle(bad)
-picked, seen = [], {frozenset(correct)}
-for t in bad:
-    if frozenset(t) in seen: continue
-    seen.add(frozenset(t)); picked.append(t)
+picked, seen = [], {tuple(x[0] for x in correct)}
+for v in bad:
+    k = tuple(x[0] for x in v)
+    if k in seen: continue
+    seen.add(k); picked.append(v)
     if len(picked) == 4: break
+assert len(picked) == 4
 cands = [correct] + picked
 order = list(range(5)); rng.shuffle(order)
 files = [D.iso([(0,0,0)], f"n1o{j}", cell=34, ch=29, labels=cands[o]) for j, o in enumerate(order)]
@@ -302,12 +369,12 @@ add(P2, "พับกล่อง / รูปคลี่", "เมื่อพ�
 # --- (2) ลูกบาศก์ → รูปคลี่ ---
 lab2 = {"A":"1","B":"2","C":"3","D":"4","E":"5","F":"6"}
 rng = random.Random(802 + SEED * 104729)
-shown = rng.choice(sorted(triples(lab2)))
+shown = rng.choice(sorted(oriented(lab2)))
 vals = sorted(lab2.values())
 alts = []
 for perm in itertools.permutations(vals):
     cand = dict(zip(["A","B","C","D","E","F"], perm))
-    if shown in triples(cand): continue
+    if shown in oriented(cand): continue
     if any(cand == a for a in alts): continue
     alts.append(cand)
     if len(alts) > 200: break
@@ -322,15 +389,22 @@ add(P2, "พับกล่อง / รูปคลี่", "ลูกบาศ�
 # --- (3) ลูกบาศก์ที่เป็นไปไม่ได้ ---
 lab3 = {"A":"A","B":"B","C":"C","D":"D","E":"E","F":"F"}
 rng = random.Random(803 + SEED * 104729)
-good3 = sorted(triples(lab3)); letters3 = sorted(lab3.values())
-imposs = [t for t in itertools.permutations(letters3, 3) if t not in set(good3)]
+goodo3 = sorted(oriented(lab3)); goodset3 = set(goodo3)
+letters3 = sorted(lab3.values())
+base3 = rng.choice(goodo3)
+imposs = [relabel(base3, t) for t in itertools.permutations(letters3, 3)]
+imposs = [v for v in imposs if v not in goodset3]
 wrong = rng.choice(imposs)
-right4, used = [], set()
-for t in good3:
-    if frozenset(t) in used or frozenset(t) == frozenset(wrong): continue
-    used.add(frozenset(t)); right4.append(t)
+right4, used = [], {frozenset(x[0] for x in wrong)}
+for v in goodo3:
+    k = frozenset(x[0] for x in v)
+    if k in used: continue
+    used.add(k); right4.append(v)
     if len(right4) == 4: break
+assert len(right4) == 4
 cands = [wrong] + right4
+# พิสูจน์ด้วยโค้ดว่ามีข้อที่เป็นไปไม่ได้แค่ข้อเดียวจริง ๆ
+assert sum(1 for c in cands if c not in goodset3) == 1
 order = list(range(5)); rng.shuffle(order)
 files = [D.iso([(0,0,0)], f"n3o{j}", cell=34, ch=29, labels=cands[o]) for j, o in enumerate(order)]
 add(P2, "พับกล่อง / รูปคลี่", "จากรูปคลี่นี้ ลูกบาศก์ในข้อใดเป็นไปไม่ได้", [""]*5, order.index(0),
@@ -378,10 +452,14 @@ for qi, (lab, mode) in enumerate(DICE, 1):
         add(P2, "ลูกเต๋าหมุน", f"ภาพทั้งสามคือลูกเต๋าลูกเดียวกันที่ถูกหมุนไป หน้าที่อยู่ตรงข้ามกับหน้า {ask} คือหน้าใด",
             opts, opts.index(ansv), img=stem)
     elif mode == "adj":
-        ask = letters[0]; opp = opposite_of(lab, ask)
+        # นับว่าแต่ละหน้าโผล่ในสามภาพกี่ครั้ง แล้วถามหน้าที่โผล่น้อยที่สุด
+        # หน้าที่เห็นครั้งเดียวต้องไล่เทียบข้ามภาพกว่าจะรู้ว่าใครอยู่ตรงข้าม
+        # (เดิมถามหน้าแรกตามตัวอักษรเสมอ ซึ่งมักเป็นหน้าที่เห็นชัดที่สุด — ติวเตอร์ว่าง่ายไป)
+        cnt3 = {x: sum(1 for v in vs for f in v if f[0] == x) for x in letters}
+        ask = min(letters, key=lambda x: (cnt3[x], x)); opp = opposite_of(lab, ask)
         opts = sorted(set([opp] + [x for x in letters if x not in (ask, opp)][:4]))
         add(P2, "ลูกเต๋าหมุน", f"ภาพทั้งสามคือลูกเต๋าลูกเดียวกันที่ถูกหมุนไป หน้าใดที่ไม่มีทางอยู่ติดกับหน้า {ask}",
-            opts, opts.index(opp), img=stem)
+            opts, opts.index(opp), img=stem, lvl=3)
     else:
         rng = random.Random(950 + qi + SEED * 104729)
         pairs = [(x, opposite_of(lab, x)) for x in letters]
@@ -460,7 +538,11 @@ for qi, (sh, mode) in enumerate(SHAPES, 1):
         for cand in [[(-x, y, z) for (x, y, z) in sh]] + neighbours(sh):
             if not (all_rots(place(cand)) & R0): odd = place(cand); break
         assert odd, qi
-        seenr = set()
+        # ROTS[0] คือการหมุน 0 องศา ถ้าไม่กันไว้ ตัวเลือกแรกจะเป็นรูปเดิมของโจทย์เป๊ะ ๆ
+        # เด็กเห็นแล้วตัดทิ้งได้ทันที (ติวเตอร์จับได้ที่ข้อ 38)
+        # ใส่ norm(sh) ลงกล่องที่เห็นแล้วตั้งแต่ต้น จึงกันทั้งการหมุน 0 องศา
+        # และมุมหมุนอื่นที่บังเอิญให้ทรงกลับมาทับรูปเดิมพอดี
+        seenr = {norm(sh)}
         rots4 = []
         for R in ROTS:
             c = place([R(p) for p in sh])
@@ -555,8 +637,47 @@ if _dup:
     raise SystemExit("ชื่อรูปชนกัน (เครื่องผลิตคนละตัวเขียนทับกัน): " +
                      ", ".join(f"{k} x{v}" for k, v in sorted(_dup.items())))
 
+# ---------- ด่านกันตัวเลือกซ้ำกับโจทย์ / ซ้ำกันเอง ----------
+# ติวเตอร์จับได้ที่ข้อ 38 ว่ามีตัวเลือกเป็นรูปเดียวกับในโจทย์เป๊ะ ๆ
+# แบบนี้เด็กตัดตัวเลือกนั้นทิ้งได้ทันทีโดยไม่ต้องคิด และถ้าเผอิญเป็นเฉลย โจทย์ก็พัง
+# เทียบด้วยลายนิ้วมือของภาพจริง (draw.HASH) ไม่ใช่ด้วยชื่อไฟล์ จึงจับได้แม้คนละชื่อ
+def _diff(a, b):
+    return sum(abs(x - y) for x, y in zip(a[2], b[2])) / len(a[2])
+
+_bad = []
+for _q in QS:
+    _opt = D.STRIPS.get((_q.get("optimg") or "")[:-4])
+    if not _opt:
+        continue
+    _h = [D.HASH.get(f[:-4]) for f in _opt]
+    _stem = D.HASH.get((_q.get("img") or "")[:-4])
+    # โจทย์กับตัวเลือกมักวาดคนละขนาด (rt3stem cell=26 · ตัวเลือก cell=22)
+    # จึงเทียบเฉพาะคู่ที่อัตราส่วนใกล้กัน แล้วยอมให้ต่างได้จากการย่อภาพ
+    for _j, _hh in enumerate(_h):
+        if not (_stem and _hh):
+            continue
+        _ra, _rb = _stem[0] / _stem[1], _hh[0] / _hh[1]
+        if abs(_ra - _rb) <= 0.06 * _ra and _diff(_stem, _hh) <= 6.0:
+            _bad.append(f'{_q["arche"]}: ตัวเลือกที่ {_j+1} เป็นรูปเดียวกับโจทย์')
+    # ตัวเลือกด้วยกันวาดจากคำสั่งเดียวกันเสมอ ขนาดจึงต้องเท่ากันเป๊ะ
+    # เกณฑ์ตรงนี้ต้องแคบมาก เพราะบางแนว (อุปมาอุปมัย) ตัวเลือกต่างกันแค่ช่องเดียว
+    # ซึ่งวัดได้แค่ 0.8 ถ้าตั้งกว้างกว่านี้จะไปจับโจทย์ที่ปกติดี
+    for _j in range(len(_h)):
+        for _k in range(_j + 1, len(_h)):
+            if not (_h[_j] and _h[_k]):
+                continue
+            if _h[_j][:2] == _h[_k][:2] and _diff(_h[_j], _h[_k]) <= 0.05:
+                _bad.append(f'{_q["arche"]}: ตัวเลือกที่ {_j+1} กับ {_k+1} เป็นรูปเดียวกัน')
+if _bad:
+    raise SystemExit("ตัวเลือกซ้ำ:\n  " + "\n  ".join(sorted(set(_bad))))
+
 print("โจทย์ที่ข้อความซ้ำ:", {k[:28]: v for k, v in stems.items() if v > 1})
 print("แนวโจทย์:", len({q["arche"] for q in QS}), "| ตำแหน่งคำตอบ:", dict(sorted(Counter(q["ansIdx"] for q in QS).items())))
+# บอก sharpen.py ว่ารูปไหนตั้งใจเก็บความละเอียดสูงไว้ให้สลับกลับตอนทำ PDF
+# ถ้าไม่จำกัดไว้ มันจะเดาจับคู่รูปโจทย์ผิดข้อแล้วสลับทับกัน (เคยทำข้อ 34 พังมาแล้ว)
+with open(os.path.join(OUT, "img", "_hires.json"), "w", encoding="utf-8") as _f:
+    json.dump(sorted(k for k, v in D.HIRES.items() if v > 1), _f)
+
 with open(os.path.join(OUT, "questions.json"), "w", encoding="utf-8") as _f:
     json.dump(QS, _f, ensure_ascii=False, indent=1)
 for lv in (1, 2, 3):

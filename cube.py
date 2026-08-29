@@ -20,8 +20,14 @@ for _i in range(4):
             _seen.add(_key); ROTS.append(_f)
 assert len(ROTS) == 24
 
-def fold(cells):
-    """คลี่ -> dict cell -> ทิศของหน้าลูกบาศก์  (None ถ้าพับไม่ได้)"""
+def frames_of(cells):
+    """คลี่ -> dict cell -> (normal, paper-right, paper-down)  (None ถ้าพับไม่ได้)
+
+    paper-right / paper-down คือทิศที่ "ขวามือ" กับ "ด้านล่าง" ของกระดาษไปโผล่ในสามมิติ
+    สองตัวนี้บอกว่าตัวอักษรบนหน้านั้นตะแคงไปทางไหนหลังพับเสร็จ
+    เดิม fold() คำนวณไว้แล้วแต่โยนทิ้ง เก็บแค่ normal ตัวอักษรจึงถูกวาดตั้งตรงเสมอ
+    ทั้งที่ของจริงมันตะแคง (ติวเตอร์ทักที่ข้อ 33 ว่า "position matter")
+    """
     cells = set(cells)
     start = min(cells)
     frames = {start: (FR, RT, DN)}          # (normal, paper-right, paper-down)
@@ -38,9 +44,13 @@ def fold(cells):
             if nb in cells and nb not in frames:
                 frames[nb] = fr; stack.append(nb)
     if len(frames) != len(cells): return None
-    dirs = {c: f[0] for c, f in frames.items()}
-    if len(set(dirs.values())) != 6: return None     # หน้าทับกัน = พับไม่ได้
-    return dirs
+    if len({f[0] for f in frames.values()}) != 6: return None   # หน้าทับกัน = พับไม่ได้
+    return frames
+
+def fold(cells):
+    """คลี่ -> dict cell -> ทิศของหน้าลูกบาศก์  (None ถ้าพับไม่ได้)"""
+    fr = frames_of(cells)
+    return None if fr is None else {c: f[0] for c, f in fr.items()}
 
 def is_net(cells):
     return fold(cells) is not None
