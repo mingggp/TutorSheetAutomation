@@ -641,6 +641,9 @@ P3 = "พาร์ทที่ 3"
 import mech
 mech.build(add, P3, random.Random(8100 + SEED * 104729))
 
+import concept
+concept.build(add, P3)
+
 import numeric
 numeric.build(add, P1, random.Random(6100 + SEED * 104729))
 
