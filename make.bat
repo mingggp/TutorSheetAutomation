@@ -25,6 +25,7 @@ REM  ชื่อวิชาตัวใหญ่
 set UP=%SUBJ%
 if "%SUBJ%"=="tpat3" set UP=TPAT3
 if "%SUBJ%"=="tgat2" set UP=TGAT2
+if "%SUBJ%"=="tpat3phys" set UP=TPAT3 ฟิสิกส์
 
 set DIR=out\%UP% %LV%
 set STU=%DIR%\[%UP%] %LV%

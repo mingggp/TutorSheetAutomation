@@ -636,6 +636,11 @@ import spatial
 spatial.build(add, P2, random.Random(5300 + SEED * 104729))
 
 # แนวพาร์ทตัวเลขที่ข้อสอบจริงออกแต่คลังเคยมี 0 ข้อ (ดูรายงาน calibrator ช่องโหว่ 3-8)
+# ---------- ท่อนเชิงกล (วีคฟิสิกส์) ----------
+P3 = "พาร์ทที่ 3"
+import mech
+mech.build(add, P3, random.Random(8100 + SEED * 104729))
+
 import numeric
 numeric.build(add, P1, random.Random(6100 + SEED * 104729))
 
