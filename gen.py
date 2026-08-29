@@ -287,7 +287,8 @@ assert len(ROTS) == 24
 
 def triples(labels):
     base = {NETDIR[k]: v for k, v in labels.items()}
-    return {(lambda f: (f[UP], f[BK], f[RT]))({R(d): l for d, l in base.items()}) for R in ROTS}
+    # (บน, ซ้าย, ขวา) ตามที่ draw.iso วาดจริง — ดูคำอธิบายใน cube.triples
+    return {(lambda f: (f[UP], f[RT], f[BK]))({R(d): l for d, l in base.items()}) for R in ROTS}
 
 # ทิศของกระดาษบนแต่ละหน้า อ่านจากรูปคลี่ที่วาดจริง (draw.NET) ไม่ใช่เขียนค่าตายตัวไว้
 # จึงเปลี่ยนรูปคลี่เมื่อไหร่ ตัวเลขก็ตะแคงตามเองโดยไม่ต้องแก้ตรงนี้
@@ -297,17 +298,32 @@ assert _NF is not None, "รูปคลี่ใน draw.NET พับเป็
 NETFRAME = {D.NET[c]: _NF[c] for c in D.NET}
 assert all(_CU.NEG(NETFRAME[k][0]) == NETFRAME[OPP[k]][0] for k in NETFRAME),     "ตาราง OPP ไม่ตรงกับรูปคลี่ที่วาดจริง"
 
-def _no_mirror_check():
-    """พิสูจน์ว่าไม่มีมุมมองไหนที่ตัวอักษรออกมากลับด้าน — การพับกระดาษจริงทำแบบนั้นไม่ได้
+# สลับแกน x กับ y = พลิกภาพหนึ่งครั้ง ใช้หักล้างกับการฉายภาพของ draw.iso ที่พลิกอยู่แล้ว
+MIR = lambda v: (v[1], v[0], v[2])
 
-    วัดจากทิศการวนมุมบนจอ ถ้าวนกลับทาง แปลว่า _glyph_on_quad จะพลิกตัวอักษร
-    ครอบทั้ง 24 มุมหมุน x 3 หน้าที่มองเห็น = 72 กรณี
+def _no_mirror_check():
+    """พิสูจน์สองอย่างที่การพับกระดาษจริงห้ามละเมิด
+
+    1. ลูกบาศก์ที่วาดต้องไม่ใช่ภาพกระจกของลูกจริง
+       บนจอ หน้าบน -> หน้าซ้าย -> หน้าขวา ไล่ทวนเข็มนาฬิกา ดังนั้น normal ของสามหน้านี้
+       ต้องเรียงแบบถนัดขวา (det > 0) เหมือนลูกเต๋าสากลที่เลข 1 2 3 ไล่ทวนเข็มรอบมุมร่วม
+       ถ้า det ติดลบ แปลว่าทุกช้อยกลายเป็นทรงที่พับไม่ได้ทั้งหมด
+
+    2. ตัวอักษรบนแต่ละหน้าต้องไม่กลับด้าน วัดจากทิศการวนมุมบนจอ
+
+    ครอบทั้ง 24 มุมหมุน x 3 หน้าที่มองเห็น
     """
     cell, ch = 26, 22
     pj = lambda x, y, z: ((x - y) * cell, (x + y) * (cell // 2) - z * ch)
+    det = lambda a, b, c: (a[0]*(b[1]*c[2]-b[2]*c[1]) - a[1]*(b[0]*c[2]-b[2]*c[0])
+                           + a[2]*(b[0]*c[1]-b[1]*c[0]))
     base = {NETFRAME[k][0]: (k, NETFRAME[k][1], NETFRAME[k][2]) for k in NETFRAME}
     for R in ROTS:
-        f = {R(n): (l, R(rt), R(dn)) for n, (l, rt, dn) in base.items()}
+        f = {MIR(R(n)): (lab, MIR(R(rt)), MIR(R(dn))) for n, (lab, rt, dn) in base.items()}
+        tru = {lab: R(n) for n, (lab, _rt, _dn) in base.items()}   # ป้าย -> normal จริง
+        top, left, right = f[UP][0], f[BK][0], f[RT][0]
+        # เทียบด้วย normal จริง ไม่ใช่ normal ในพิกัดภาพ (ในพิกัดภาพมันติดลบเสมอโดยนิยาม)
+        assert det(tru[top], tru[left], tru[right]) > 0, "ลูกบาศก์ที่วาดเป็นภาพกระจก"
         for key, nrm in (("top", UP), ("left", BK), ("right", RT)):
             _l, rt, dn = f[nrm]
             UL, UR, LR, LL = [pj(*c) for c in D._order_quad(D._CORNERS[key], rt, dn)]
@@ -328,7 +344,11 @@ def oriented(labels):
     base = {NETFRAME[k][0]: (v, NETFRAME[k][1], NETFRAME[k][2]) for k, v in labels.items()}
     out = set()
     for R in ROTS:
-        f = {R(n): (lab, R(rt), R(dn)) for n, (lab, rt, dn) in base.items()}
+        # MIR สลับแกน x กับ y = พลิกภาพหนึ่งครั้ง เพื่อหักล้างกับการฉายภาพของ iso
+        # ที่พลิกอยู่แล้ว (พิสูจน์แล้วว่า r x u ชี้ออกจากผู้ดู และ det[UP,BK,RT] = -1)
+        # ถ้าไม่หักล้าง ลูกบาศก์ที่วาดจะเป็นภาพกระจกของลูกจริง
+        # ผลคือช้อยที่ควรเป็นไปได้กลายเป็นเป็นไปไม่ได้หมด (ติวเตอร์จับได้ที่ข้อ 33/34)
+        f = {MIR(R(n)): (lab, MIR(R(rt)), MIR(R(dn))) for n, (lab, rt, dn) in base.items()}
         out.add((f[UP], f[BK], f[RT]))
     return out
 
@@ -343,6 +363,22 @@ def opposite_of(labels, x):
     inv = {v: k for k, v in labels.items()}
     return labels[OPP[inv[x]]]
 
+def rank_bad(view, lab, letters, rng):
+    """เรียงตัวลวงจาก "ผิดชัด" ไป "ผิดละเอียด"
+
+    ผิดชัด = สามหน้านั้นมาอยู่ด้วยกันไม่ได้เลย (มีคู่ตรงข้ามปนมา หรือเรียงกลับมือ)
+             แก้ได้ด้วยวิธีคลาสสิกคือดูคู่ตรงข้ามกับทิศการวน
+    ผิดละเอียด = หน้าถูกแต่ตัวอักษรตะแคงผิด ต้องไล่ทีละหน้า
+
+    เอาผิดชัดขึ้นก่อน ไม่งั้นทั้งข้อจะเหลือแต่ตัวลวงที่ต้องเพ่งทิศตัวอักษรอย่างเดียว
+    """
+    plain = triples(lab)
+    out = [(t in plain, t, relabel(view, t))      # False = ผิดชัด มาก่อน
+           for t in itertools.permutations(letters, 3)]
+    rng.shuffle(out)                              # สลับก่อน แล้วค่อยเรียง
+    out.sort(key=lambda x: x[0])                  # sort ของ python เสถียร ลำดับในกลุ่มจึงยังสุ่มอยู่
+    return out
+
 # --- (1) รูปคลี่ → ลูกบาศก์ ---
 setlv(2)
 lab1 = {"A":"P","B":"Q","C":"R","D":"S","E":"T","F":"U"}
@@ -350,9 +386,8 @@ rng = random.Random(801 + SEED * 104729)
 goodo = sorted(oriented(lab1)); goodset = set(goodo)
 correct = rng.choice(goodo)
 letters = sorted(lab1.values())
-bad = [relabel(correct, t) for t in itertools.permutations(letters, 3)]
-bad = [v for v in bad if v not in goodset]
-rng.shuffle(bad)
+ranked = rank_bad(correct, lab1, letters, rng)
+bad = [v for _p, _t, v in ranked if v not in goodset]
 picked, seen = [], {tuple(x[0] for x in correct)}
 for v in bad:
     k = tuple(x[0] for x in v)
@@ -392,9 +427,8 @@ rng = random.Random(803 + SEED * 104729)
 goodo3 = sorted(oriented(lab3)); goodset3 = set(goodo3)
 letters3 = sorted(lab3.values())
 base3 = rng.choice(goodo3)
-imposs = [relabel(base3, t) for t in itertools.permutations(letters3, 3)]
-imposs = [v for v in imposs if v not in goodset3]
-wrong = rng.choice(imposs)
+imposs = [v for _p, _t, v in rank_bad(base3, lab3, letters3, rng) if v not in goodset3]
+wrong = imposs[0]          # เอาตัวที่ผิดตั้งแต่การจัดวางหน้า ไม่ใช่ผิดแค่ทิศตัวอักษร
 right4, used = [], {frozenset(x[0] for x in wrong)}
 for v in goodo3:
     k = frozenset(x[0] for x in v)

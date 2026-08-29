@@ -618,7 +618,7 @@
    "",
    ""
   ],
-  "ansIdx": 1,
+  "ansIdx": 2,
   "img": "n1stem.png",
   "optimg": "n1opt.png",
   "lvl": 1
@@ -650,7 +650,7 @@
    "",
    ""
   ],
-  "ansIdx": 2,
+  "ansIdx": 0,
   "img": "n3stem.png",
   "optimg": "n3opt.png",
   "lvl": 2

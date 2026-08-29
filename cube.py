@@ -60,7 +60,10 @@ def triples(dirs_to_label):
     out = set()
     for R in ROTS:
         f = {R(d): lab for d, lab in dirs_to_label.items()}
-        out.add((f[UP], f[BK], f[RT]))
+        # ลำดับนี้คือ (บน, ซ้าย, ขวา) ตามที่ draw.iso วาดออกมาจริง
+        # การฉายภาพของ iso เป็นภาพกลับด้าน (det[UP,BK,RT] = -1) หน้าที่โผล่ทางซ้ายของภาพ
+        # จึงเป็นหน้า +x ไม่ใช่ +y ถ้าเรียงตามแกนตรง ๆ ลูกบาศก์ที่ได้จะเป็นภาพกระจกของลูกจริง
+        out.add((f[UP], f[RT], f[BK]))
     return out
 
 def label_dirs(cells, labels):
