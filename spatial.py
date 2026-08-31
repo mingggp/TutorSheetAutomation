@@ -481,21 +481,21 @@ def build(add, P2, rng):
     แทบไม่เคยเป็นเฉลยเลยในคลังเดิม (กติกาข้อ 4)
     """
     want = 0
-    for qi in range(2):                       # ★★☆ ซ้อนแผ่นบังแสง
+    for qi in range(4):                       # ★★☆ ซ้อนแผ่นบังแสง
         A, B, opts, idx = overlay(rng, want=want, n=6)
         img, optimg = render_overlay(A, B, opts, f"ov{qi}")
         add(P2, "ซ้อนแผ่นบังแสง", OVERLAY_STEM, [""] * 5, idx,
             img=img, optimg=optimg, lvl=2)
         want = (want + 2) % 5
 
-    for qi in range(2):                       # ★★☆ อนุกรมรูปภาพ กฎชั้นเดียว
+    for qi in range(4):                       # ★★☆ อนุกรมรูปภาพ กฎชั้นเดียว
         frames, opts, idx, _ = series(rng, want=want, hard=False)
         img, optimg = render_series(frames, opts, f"sr{qi}")
         add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
             img=img, optimg=optimg, lvl=2)
         want = (want + 2) % 5
 
-    for qi in range(2):                       # ★★★ อนุกรมรูปภาพ กฎซ้อนสองชั้น
+    for qi in range(4):                       # ★★★ อนุกรมรูปภาพ กฎซ้อนสองชั้น
         frames, opts, idx, _ = series(rng, want=want, hard=True)
         img, optimg = render_series(frames, opts, f"sh{qi}")
         add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
@@ -517,7 +517,7 @@ def build(add, P2, rng):
             img=img, optimg=optimg, lvl=2)
         want = (want + 2) % 5
 
-    for qi in range(2):                       # ★★★ เมทริกซ์ สามคุณลักษณะ มีการหมุนซ้อน
+    for qi in range(4):                       # ★★★ เมทริกซ์ สามคุณลักษณะ มีการหมุนซ้อน
         cells, opts, idx = matrix(rng, want=want, attrs=3)
         img, optimg = render_matrix(cells, opts, f"mh{qi}")
         add(P2, "เมทริกซ์รูปภาพ", MATRIX_STEM, [""] * 5, idx,
@@ -532,13 +532,13 @@ def build(add, P2, rng):
             [""] * 5, idx, img=img, optimg=optimg, lvl=2 if ax != "d" else 3)
         want = (want + 2) % 5
 
-    for qi in range(3):                       # ★★☆ หารูปไม่เข้าพวก
+    for qi in range(5):                       # ★★☆ หารูปไม่เข้าพวก
         opts, idx = oddgrid(rng, want=want)
         add(P2, "หารูปไม่เข้าพวก", ODDG_STEM, [""] * 5, idx,
             optimg=render_oddgrid(opts, f"og{qi}"), lvl=2)
         want = (want + 2) % 5
 
-    for qi in range(3):                       # ★★★ อุปมาอุปไมยรูปภาพ
+    for qi in range(5):                       # ★★★ อุปมาอุปไมยรูปภาพ
         A, B, Cc, opts, idx = analogy(rng, want=want)
         img, optimg = render_analogy(A, B, Cc, opts, f"pana{qi}")
         add(P2, "อุปมาอุปไมยรูปภาพ", ANALOGY_STEM, [""] * 5, idx,

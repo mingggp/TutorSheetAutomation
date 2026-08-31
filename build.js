@@ -20,15 +20,35 @@ const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf
 if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
 const PMETA=Object.fromEntries(SUB.parts.map(p=>[p.key,p]));
 
+// ลำดับการหยิบตามระดับดาว ตัวแรกคือระดับหลักของชีท ที่เหลือคือตัวเติม
+// ชีทระดับกลางเติมด้วยข้อยากก่อนข้อง่าย เพราะข้อสอบความถนัดต้องมีข้อที่ยืดเพดานให้เด็ก
+// (เดิมเติมด้วยข้อง่ายก่อน ทำให้ชีท 50 ข้อไม่มีข้อสามดาวเลยสักข้อ)
 const PLAN={
   easy:{prio:[1,2,3], star:'star1.png'},
-  std :{prio:[2,1,3], star:'star2.png'},
+  std :{prio:[2,3,1], star:'star2.png'},
   hard:{prio:[3,2,1], star:'star3.png'},
 }[MIX];
 if(!PLAN){console.error('mix ต้องเป็น easy | std | hard');process.exit(1);}
 
 function pickPart(part,quota){
-  const idx=BANK.map((q,i)=>({q,i})).filter(o=>o.q.part===part);
+  let idx=BANK.map((q,i)=>({q,i})).filter(o=>o.q.part===part);
+  // --set ต้องเปลี่ยน *ตัวโจทย์* ไม่ใช่แค่ป้ายชื่อชุด ไม่งั้นชีทสัปดาห์หน้าจะซ้ำของเดิม
+  //
+  // หมุนทั้งกองไม่ได้ผล เพราะเพดาน CAP ข้อต่อแนวจะหยิบสองตัวแรกของแต่ละแนวเหมือนเดิม
+  // ต้องหมุน *ภายในแต่ละแนว* แล้วเอากลับไปวางที่ตำแหน่งเดิม
+  // ชุดที่ 2 จึงได้ข้อที่ 3-4 ของแนวนั้น แทนที่จะได้ข้อที่ 1-2 ซ้ำ
+  const setn=(parseInt(SET,10)||1)-1;
+  if(setn){
+    const by={};
+    idx.forEach((o,k)=>{ (by[o.q.arche]=by[o.q.arche]||[]).push(k); });
+    const rot=idx.slice();
+    for(const a in by){
+      const slots=by[a], m=slots.length;
+      const sh=(setn*CAP)%m;
+      slots.forEach((slot,k)=>{ rot[slot]=idx[slots[(k+sh)%m]]; });
+    }
+    idx=rot;
+  }
   const out=[], seen=new Set(), n={};
   // เก็บทีละรอบ ค่อย ๆ ผ่อนเพดานจำนวนข้อต่อแนว
   // รอบแรกจำกัดแนวละ CAP ข้อตามกติกาข้อ 5 ถ้าคลังไม่พอค่อยผ่อนทีละขั้น
