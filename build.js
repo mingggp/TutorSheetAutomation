@@ -128,6 +128,11 @@ function questionKept(q,i){
     });
     push(runs,{before:130,after:60,indent:{left:IND},tabStops:COLTABS});
   }
+  // ฉบับครูเท่านั้น — บรรทัดคำอธิบายสั้น ๆ ใต้ตัวเลือก ครูกวาดตาผ่านแล้วนึกออกทันที
+  if(KEY && q.why){
+    push([T("แนวคิด  ",{size:21,bold:true,color:SUBC}),T(q.why,{size:21,color:MID})],
+         {before:70,after:0,line:260,indent:{left:IND}});
+  }
   return out.map(([runs,o],k)=>P(runs,{...o,keepNext:k<out.length-1}));
 }
 

@@ -602,136 +602,201 @@ if __name__ == "__main__":
 # ของจริงถามแนว "อ่านรูปแล้วตัดสิน" เป็นหลัก ฟังก์ชันสามตัวนี้จึงต้องวาดรูปที่อ่านออกชัด
 # ตัวเลขสำคัญ (จำนวนฟัน ระยะ น้ำหนัก) พิมพ์กำกับในรูปเสมอ ไม่ให้เด็กต้องเดาจากขนาด
 
-def gears(teeth, name, names=None, spin=None, unit=2.0, pad=16):
-    """ชุดเฟืองขบกันเรียงเป็นแถว รัศมีแปรตามจำนวนฟัน
+def _gear_teeth(node):
+    """node = จำนวนฟัน (เฟืองเดี่ยว) หรือ (ฟันวงใน, ฟันวงนอก) สำหรับเฟืองซ้อนเพลา"""
+    return (node, node) if isinstance(node, int) else (node[0], node[1])
 
-    teeth = จำนวนฟันของแต่ละตัว · names = ป้ายใต้เฟือง เช่น ["ก","ข","ค"]
-    spin  = (ดัชนีเฟืองที่โจทย์บอกทิศ, True ถ้าตามเข็ม) วาดลูกศรโค้งกำกับให้ตัวนั้น
 
-    ขีดรอบขอบมีจำนวนเท่าจำนวนฟันจริง เด็กที่อยากนับจึงนับได้ ไม่ใช่รูปประดับ
+def gears(nodes, name, names=None, spin=None, angles=None, unit=2.0, pad=18):
+    """ชุดเฟือง — วางเรียงเป็นเส้นตรงหรือหักมุมก็ได้ และรองรับเฟืองซ้อนเพลา
+
+    nodes[i] = จำนวนฟัน                          เฟืองเดี่ยว
+             = (ฟันที่ขบตัวก่อน, ฟันที่ขบตัวถัดไป)   เฟืองสองวงบนเพลาเดียวกัน
+    angles[i] = มุมที่ตัวถัดไปวางเอียงจากแนวนอน (องศา) ยาว len(nodes)-1
+    spin = (ดัชนีเฟืองที่โจทย์บอกทิศ, True ถ้าตามเข็ม)
+
+    **เฟืองซ้อนเพลาสำคัญตรงที่มันทำให้อัตราทดคูณกัน** เฟืองเรียงธรรมดาตัวกลางไม่มีผล
+    แต่พอมีเฟืองซ้อนเพลาแล้ว ตัวกลางมีผลทันที ซึ่งเป็นกับดักหลักของแนวนี้
     """
     import math
-    R = [max(9.0, t * unit) for t in teeth]
-    cx = [R[0]]
-    for i in range(1, len(R)):
-        cx.append(cx[-1] + R[i - 1] + R[i])
-    top = 26 if spin is not None else 8
-    W = int(cx[-1] + R[-1] + pad * 2)
-    H = int(max(R) * 2 + pad * 2 + top + 30)
+    T = [_gear_teeth(n) for n in nodes]
+    R = [(max(9.0, a * unit), max(9.0, b * unit)) for a, b in T]
+    ang = list(angles or [0] * (len(nodes) - 1))
+    cx, cy = [0.0], [0.0]
+    for i in range(1, len(nodes)):
+        dist = R[i - 1][1] + R[i][0]
+        a = math.radians(ang[i - 1])
+        cx.append(cx[-1] + dist * math.cos(a))
+        cy.append(cy[-1] + dist * math.sin(a))
+    rad = [max(r) for r in R]
+    x0 = min(c - r for c, r in zip(cx, rad)) - pad
+    y0 = min(c - r for c, r in zip(cy, rad)) - pad - (12 if spin is not None else 0)
+    W = int(max(c + r for c, r in zip(cx, rad)) + pad - x0)
+    H = int(max(c + r for c, r in zip(cy, rad)) + pad + 20 - y0)
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
-    cy = (pad + top + max(R)) * S
-    f = font(13, True)
-    fl = font(14, True)
-    for i, t in enumerate(teeth):
-        X, rr = (cx[i] + pad) * S, R[i] * S
-        d.ellipse([X - rr, cy - rr, X + rr, cy + rr], fill=TOPF, outline=INK, width=max(1, S))
-        for k in range(t):
-            a = 2 * math.pi * k / t
-            d.line([X + math.cos(a) * rr * 0.82, cy + math.sin(a) * rr * 0.82,
-                    X + math.cos(a) * rr, cy + math.sin(a) * rr], fill=INK, width=max(1, S))
-        hr = rr * 0.58
-        d.ellipse([X - hr, cy - hr, X + hr, cy + hr], fill="white", outline=LINEG, width=max(1, S))
-        lab = str(t)
-        d.text((X - d.textlength(lab, font=f) / 2, cy - 9 * S), lab, font=f, fill=INK)
-        if names:
+    f, fl = font(13, True), font(14, True)
+
+    def ring(X, Y, rr, teeth, fill):
+        d.ellipse([X - rr, Y - rr, X + rr, Y + rr], fill=fill, outline=INK, width=max(1, S))
+        for k in range(teeth):
+            a = 2 * math.pi * k / teeth
+            d.line([X + math.cos(a) * rr * 0.82, Y + math.sin(a) * rr * 0.82,
+                    X + math.cos(a) * rr, Y + math.sin(a) * rr], fill=INK, width=max(1, S))
+
+    later = []
+    for i, node in enumerate(nodes):
+        X, Y = (cx[i] - x0) * S, (cy[i] - y0) * S
+        ti, to = T[i]
+        ri, ro = R[i][0] * S, R[i][1] * S
+        if ti == to:
+            ring(X, Y, ro, to, TOPF)
+            hr = ro * 0.58
+            d.ellipse([X - hr, Y - hr, X + hr, Y + hr], fill="white", outline=LINEG, width=max(1, S))
+            lab = str(to)
+            d.text((X - d.textlength(lab, font=f) / 2, Y - 9 * S), lab, font=f, fill=INK)
+        else:
+            big, small = (ro, ri) if ro > ri else (ri, ro)
+            bt, st = (to, ti) if ro > ri else (ti, to)
+            ring(X, Y, big, bt, TOPF)
+            ring(X, Y, small, st, LEFTF)      # วงในสีเข้มกว่า ให้เห็นว่าเป็นคนละวง
+            hr = small * 0.5
+            d.ellipse([X - hr, Y - hr, X + hr, Y + hr], fill="white", outline=LINEG, width=max(1, S))
+            d.text((X - d.textlength(str(st), font=f) / 2, Y - 8 * S), str(st), font=f, fill=INK)
+            later.append((X, Y + big * 0.60, str(bt)))   # เลขวงนอก วาดทีหลังกันโดนทับ
+    for X, Y, txt in later:
+        tw = d.textlength(txt, font=f)
+        d.rectangle([X - tw / 2 - 3 * S, Y - 2 * S, X + tw / 2 + 3 * S, Y + 17 * S], fill="white")
+        d.text((X - tw / 2, Y), txt, font=f, fill=INK)
+
+    if names:
+        # วาดป้ายชื่อทีหลังทั้งหมด ไม่งั้นเฟืองตัวถัดไปจะทับป้ายของตัวก่อนหน้า
+        # (เห็นชัดตอนวางหักมุม เพราะเฟืองสองตัวมาอยู่ใกล้กันในแนวดิ่ง)
+        for i, node in enumerate(nodes):
+            X, Y = (cx[i] - x0) * S, (cy[i] - y0) * S
+            rr = max(R[i]) * S
             nm = names[i]
-            d.text((X - d.textlength(nm, font=fl) / 2, cy + rr + 9 * S), nm, font=fl, fill=INK)
+            tw = d.textlength(nm, font=fl)
+            d.rectangle([X - tw / 2 - 3 * S, Y + rr + 3 * S,
+                         X + tw / 2 + 3 * S, Y + rr + 21 * S], fill="white")
+            d.text((X - tw / 2, Y + rr + 4 * S), nm, font=fl, fill=INK)
+
     if spin is not None:
         i, cwise = spin
-        X, rr = (cx[i] + pad) * S, R[i] * S
-        ar = rr * 1.42
-        box = [X - ar, cy - ar, X + ar, cy + ar]
-        d.arc(box, 202, 338, fill=INK, width=max(1, S))
-        ex = 338 if cwise else 202
-        a = math.radians(ex)
-        px, py = X + math.cos(a) * ar, cy + math.sin(a) * ar
-        s = 5 * S
-        tang = (-math.sin(a), math.cos(a)) if cwise else (math.sin(a), -math.cos(a))
-        d.polygon([(px + tang[0] * s, py + tang[1] * s),
-                   (px - tang[0] * s * .3 - math.cos(a) * s, py - tang[1] * s * .3 - math.sin(a) * s),
-                   (px - tang[0] * s * .3 + math.cos(a) * s, py - tang[1] * s * .3 + math.sin(a) * s)],
+        X, Y = (cx[i] - x0) * S, (cy[i] - y0) * S
+        ar = max(R[i]) * S * 1.42
+        d.arc([X - ar, Y - ar, X + ar, Y + ar], 202, 338, fill=INK, width=max(1, S))
+        a = math.radians(338 if cwise else 202)
+        px, py = X + math.cos(a) * ar, Y + math.sin(a) * ar
+        sz = 5 * S
+        tg = (-math.sin(a), math.cos(a)) if cwise else (math.sin(a), -math.cos(a))
+        d.polygon([(px + tg[0] * sz, py + tg[1] * sz),
+                   (px - tg[0] * sz * .3 - math.cos(a) * sz, py - tg[1] * sz * .3 - math.sin(a) * sz),
+                   (px - tg[0] * sz * .3 + math.cos(a) * sz, py - tg[1] * sz * .3 + math.sin(a) * sz)],
                   fill=INK)
     return _save(im, W, H, name)
 
 
-def beam(marks, name, unit=15, pad=14, bar=250):
-    """คานบนจุดหมุนสามเหลี่ยม — marks = list ของ (ระยะจากจุดหมุน, ป้าย)
+def beam(marks, name, span=8, unit=17, pad=14):
+    """คานบนจุดหมุนสามเหลี่ยม — marks = [(ตำแหน่งนับเป็นขีด, ป้าย)] ลบคือฝั่งซ้าย
 
-    ระยะติดลบคือฝั่งซ้าย · ป้าย "?" คือช่องที่โจทย์ถาม
-    น้ำหนักวางอยู่ *บน* คาน จุดหมุนอยู่ใต้คาน จะได้ไม่บังกัน
-    ตัวเลขระยะพิมพ์กำกับไว้เหนือก้อนน้ำหนัก เด็กจึงอ่านโมเมนต์ได้โดยไม่ต้องวัดจากรูป
+    **ไม่พิมพ์ตัวเลขระยะกำกับ** วาดขีดห่างเท่า ๆ กันบนคานให้นับเอาเอง
+    ซึ่งเป็นวิธีที่ข้อสอบจริงใช้ ตัวเลขกำกับทำให้รกและทำให้ข้อง่ายลงโดยไม่จำเป็น
+
+    ผู้เรียกต้องเว้นตำแหน่งให้ห่างกันอย่างน้อย 2 ขีด ไม่งั้นกล่องน้ำหนักจะซ้อนกัน
+    (2 ขีด = 34 จุด ส่วนกล่องกว้าง 30 จุด)
     """
-    W = int(bar + pad * 2)
-    H = int(pad * 2 + 96)
+    BW = 15
+    W = int(span * 2 * unit + pad * 2 + BW * 2)
+    H = int(pad * 2 + 92)
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
-    mid = (pad + bar / 2) * S
-    y0 = (pad + 52) * S                     # ผิวบนของคาน
+    lw = max(1, S)
+    mid = W / 2 * S
+    y0 = (pad + 46) * S
     f = font(13, True)
-    fs = font(11, False)
-    d.rectangle([pad * S, y0, (pad + bar) * S, y0 + 7 * S],
-                fill=TOPF, outline=INK, width=max(1, S))
-    d.polygon([(mid, y0 + 7 * S), (mid - 15 * S, y0 + 32 * S), (mid + 15 * S, y0 + 32 * S)],
+    d.rectangle([(pad + BW) * S, y0, (W - pad - BW) * S, y0 + 7 * S],
+                fill=TOPF, outline=INK, width=lw)
+    for k in range(-span, span + 1):
+        X = mid + k * unit * S
+        d.line([X, y0 + 7 * S, X, y0 + (11 if k else 7) * S], fill=LINEG, width=lw)
+    d.polygon([(mid, y0 + 7 * S), (mid - 15 * S, y0 + 30 * S), (mid + 15 * S, y0 + 30 * S)],
               fill=LEFTF, outline=INK)
-    d.line([mid - 26 * S, y0 + 32 * S, mid + 26 * S, y0 + 32 * S], fill=INK, width=max(1, S))
+    d.line([mid - 26 * S, y0 + 30 * S, mid + 26 * S, y0 + 30 * S], fill=INK, width=lw)
     for dist, lab in marks:
         X = mid + dist * unit * S
-        d.rectangle([X - 15 * S, y0 - 25 * S, X + 15 * S, y0],
-                    fill="white" if lab == "?" else TOPF, outline=INK, width=max(1, S))
-        d.text((X - d.textlength(lab, font=f) / 2, y0 - 21 * S), lab, font=f, fill=INK)
-        dl = str(abs(dist))
-        d.text((X - d.textlength(dl, font=fs) / 2, y0 - 42 * S), dl, font=fs, fill=LINEG)
+        d.rectangle([X - BW * S, y0 - 24 * S, X + BW * S, y0],
+                    fill="white" if lab == "?" else TOPF, outline=INK, width=lw)
+        d.text((X - d.textlength(lab, font=f) / 2, y0 - 20 * S), lab, font=f, fill=INK)
     return _save(im, W, H, name)
 
 
-def pulley(n, name, load="W", unit=26, pad=14):
+def pulley(n, name, load="W", unit=26, pad=14, mirror=False):
     """ระบบรอก — n คือจำนวนเส้นเชือกที่ช่วยกันรับน้ำหนัก แรงที่ต้องออกคือ W/n
 
     เชือกเส้นเดียวพาดสลับขึ้นลง ปลายหนึ่งต้องมีจุดยึดเสมอ จุดยึดอยู่ที่ไหนขึ้นกับ n
       n คู่  ปลายผูกไว้กับเพดาน  แล้วอ้อมรอกล่างเป็นคู่แรก
       n คี่  ปลายผูกไว้กับรอกล่าง แล้วอ้อมรอกบนเป็นคู่แรก
     ถ้าวาดผิดข้อนี้ รูปจะกลายเป็นเชือกที่ไม่ได้ยึดกับอะไรเลย ซึ่งยกของไม่ขึ้น
+
+    mirror = สลับซ้ายขวา ใช้เปลี่ยนหน้าตารูปเมื่อชีทมีข้อแนวรอกหลายข้อ
+    รอกล่างต้องลอยเหนือคานของบล็อกเคลื่อนที่ ไม่ใช่จมลงไปในคาน
+    ไม่งั้นคนอ่านจะนึกว่ารอกฝังอยู่ในแท่ง แล้วนับเส้นเชือกผิด
     """
-    W = int(unit * (n - 1) + pad * 2 + 62)
-    H = int(pad * 2 + 152)
+    RS, WRAP = 7, 11
+    W = int(unit * (n - 1) + pad * 2 + 64)
+    H = int(pad * 2 + 168)
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
     lw = max(1, S)
-    yc = (pad + 14) * S                     # ระดับรอกบน (ใต้เพดาน)
-    yb = (pad + 100) * S                    # ระดับรอกล่าง
-    x0 = pad + 20
+    yc = (pad + 14) * S
+    yb = (pad + 96) * S
+    ybar = yb + (WRAP + 9) * S
+    x0 = pad + 22
     xs = [(x0 + i * unit) * S for i in range(n)]
+    fx = xs[-1] + 30 * S
+    MX = W * S
+    flip = (lambda x: MX - x) if mirror else (lambda x: x)
+
     d.rectangle([pad * S, (pad + 2) * S, (W - pad) * S, yc - 8 * S],
                 fill=LEFTF, outline=INK, width=lw)
-    for x in xs:                            # เส้นเชือกแนวดิ่ง
-        d.line([x, yc, x, yb], fill=INK, width=lw)
+    for x in xs:
+        d.line([flip(x), yc, flip(x), yb], fill=INK, width=lw)
+
     def sheave(xa, xb, y, lower):
         cx = (xa + xb) / 2
-        d.arc([xa, y - 11 * S, xb, y + 11 * S], 0 if lower else 180, 180 if lower else 360,
-              fill=INK, width=lw)
-        d.ellipse([cx - 7 * S, y - 7 * S, cx + 7 * S, y + 7 * S],
+        d.arc([min(flip(xa), flip(xb)), y - WRAP * S, max(flip(xa), flip(xb)), y + WRAP * S],
+              0 if lower else 180, 180 if lower else 360, fill=INK, width=lw)
+        d.ellipse([flip(cx) - RS * S, y - RS * S, flip(cx) + RS * S, y + RS * S],
                   fill=TOPF, outline=INK, width=lw)
+        return cx
+
     for i in range(n - 1):
-        low = (i % 2) == (n % 2)            # ที่มาของกฎนี้อยู่ในคำอธิบายด้านบน
-        sheave(xs[i], xs[i + 1], yb if low else yc, low)
-    d.rectangle([xs[0] - 13 * S, yb, xs[-1] + 13 * S, yb + 14 * S],
-                fill=LEFTF, outline=INK, width=lw)
-    if n % 2 == 0:                          # จุดยึดที่เพดาน
-        d.line([xs[0], yc - 8 * S, xs[0], yc], fill=INK, width=lw)
-        d.ellipse([xs[0] - 4 * S, yc - 12 * S, xs[0] + 4 * S, yc - 4 * S],
+        low = (i % 2) == (n % 2)
+        cx = sheave(xs[i], xs[i + 1], yb if low else yc, low)
+        if low:
+            d.line([flip(cx), yb + RS * S, flip(cx), ybar], fill=INK, width=lw)
+    left = min(flip(xs[0] - 13 * S), flip(xs[-1] + 13 * S))
+    right = max(flip(xs[0] - 13 * S), flip(xs[-1] + 13 * S))
+    d.rectangle([left, ybar, right, ybar + 13 * S], fill=LEFTF, outline=INK, width=lw)
+    if n % 2 == 0:
+        d.line([flip(xs[0]), yc - 8 * S, flip(xs[0]), yc], fill=INK, width=lw)
+        d.ellipse([flip(xs[0]) - 4 * S, yc - 12 * S, flip(xs[0]) + 4 * S, yc - 4 * S],
                   fill="white", outline=INK, width=lw)
-    bw, bx = 32 * S, (xs[0] + xs[-1]) / 2
-    d.line([bx, yb + 14 * S, bx, yb + 30 * S], fill=INK, width=lw)
-    d.rectangle([bx - bw / 2, yb + 30 * S, bx + bw / 2, yb + 54 * S],
+    else:
+        d.line([flip(xs[0]), yb, flip(xs[0]), ybar], fill=INK, width=lw)
+
+    bw, bx = 32 * S, flip((xs[0] + xs[-1]) / 2)
+    d.line([bx, ybar + 13 * S, bx, ybar + 28 * S], fill=INK, width=lw)
+    d.rectangle([bx - bw / 2, ybar + 28 * S, bx + bw / 2, ybar + 51 * S],
                 fill=TOPF, outline=INK, width=lw)
     f = font(14, True)
-    d.text((bx - d.textlength(load, font=f) / 2, yb + 35 * S), load, font=f, fill=INK)
-    fx = xs[-1] + 30 * S                    # ปลายเชือกที่มือดึง
+    d.text((bx - d.textlength(load, font=f) / 2, ybar + 32 * S), load, font=f, fill=INK)
     sheave(xs[-1], fx, yc, False)
-    d.line([fx, yc, fx, yc + 44 * S], fill=INK, width=lw)
-    d.polygon([(fx, yc + 54 * S), (fx - 6 * S, yc + 41 * S), (fx + 6 * S, yc + 41 * S)], fill=INK)
-    d.text((fx - d.textlength("F", font=f) / 2, yc + 58 * S), "F", font=f, fill=INK)
+    d.line([flip(fx), yc, flip(fx), yc + 42 * S], fill=INK, width=lw)
+    d.polygon([(flip(fx), yc + 52 * S), (flip(fx) - 6 * S, yc + 39 * S),
+               (flip(fx) + 6 * S, yc + 39 * S)], fill=INK)
+    d.text((flip(fx) - d.textlength("F", font=f) / 2, yc + 56 * S), "F", font=f, fill=INK)
     return _save(im, W, H, name)
 
 
@@ -779,64 +844,207 @@ def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=
     return _save(im, W, H, name)
 
 
-def circuit(blocks, name, emf=None, bw=44, bh=20, gap=26, pad=16):
-    """วงจรตัวต้านทาน — blocks เรียงกันแบบอนุกรม
+def _zig(d, x1, x2, y, lw, n=6, amp=7):
+    """สัญลักษณ์ตัวต้านทานแบบซิกแซก วาดคร่อมเส้นลวดระหว่าง x1 ถึง x2"""
+    body = (x2 - x1) * 0.62
+    a = x1 + ((x2 - x1) - body) / 2
+    d.line([x1, y, a, y], fill=INK, width=lw)
+    pts = [(a, y)]
+    for k in range(n):
+        pts.append((a + body * (k + 0.5) / n, y + (amp * S if k % 2 == 0 else -amp * S)))
+    pts.append((a + body, y))
+    d.line(pts, fill=INK, width=lw, joint="curve")
+    d.line([a + body, y, x2, y], fill=INK, width=lw)
+
+
+def circuit(blocks, name, emf=None, bw=54, gap=22, pad=16):
+    """วงจรตัวต้านทาน — blocks เรียงกันแบบอนุกรม สายลวดต่อเนื่องตลอด
 
     แต่ละ block เป็นได้สองแบบ
       "R1"                        ตัวเดียว
-      [["R1","R2"], ["R3"]]       ขนานกัน แต่ละสาขาเป็นตัวต้านทานต่ออนุกรมกันได้อีก
-    โครงนี้พอสำหรับวงจรลึกสองชั้น ซึ่งครอบแนว "ย่อวงจร" ที่ข้อสอบจริงถาม
+      [["R1","R2"], ["R3"]]       ขนานกัน แต่ละสาขาต่ออนุกรมกันได้อีก
+
+    ตัวต้านทานวาดเป็น**สัญลักษณ์ซิกแซกจริง** ไม่ใช่กล่องสี่เหลี่ยม
+    และทุกช่องว่างต้องมีเส้นลวดคาดไว้ ไม่งั้นคนอ่านจะนึกว่าเป็นวงจรเปิด
+    ตัวเลขไม่ใส่หน่วย เพราะฟอนต์ Sarabun ไม่มีอักขระโอห์ม ต้องไปบอกหน่วยในตัวโจทย์
     """
-    LEAD = 15                       # ช่องว่างหัวท้ายสาขา ให้เห็นเส้นลวดที่ต่อขนาน
+    BH = 30
     def bwidth(b):
         if isinstance(b, str):
             return bw
-        n = max(len(br) for br in b)
-        return n * bw + (n + 1) * LEAD
+        return max(len(br) for br in b) * bw
     def bheight(b):
-        return bh if isinstance(b, str) else len(b) * bh + (len(b) - 1) * gap
+        return BH if isinstance(b, str) else len(b) * BH + (len(b) - 1) * gap
 
     tot = sum(bwidth(b) for b in blocks) + gap * (len(blocks) + 1)
     inner = max(bheight(b) for b in blocks)
     W = int(tot + pad * 2 + 46)
-    H = int(inner + 96 + pad * 2)
+    H = int(inner + 104 + pad * 2)
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
     lw = max(1, S)
     f = font(12, True)
-    ytop = (pad + 20) * S
-    ybot = ytop + (inner + 62) * S
+    ytop = (pad + 26) * S
+    ybot = ytop + (inner + 64) * S
     x = pad + 46
 
-    def box(cx, cy, lab):
-        d.rectangle([cx - bw / 2 * S, cy - bh / 2 * S, cx + bw / 2 * S, cy + bh / 2 * S],
-                    fill=TOPF, outline=INK, width=lw)
-        d.text((cx - d.textlength(lab, font=f) / 2, cy - 8 * S), lab, font=f, fill=INK)
+    def part(xa, xb, y, lab):
+        _zig(d, xa, xb, y, lw)
+        d.text(((xa + xb) / 2 - d.textlength(lab, font=f) / 2, y - 24 * S), lab, font=f, fill=INK)
 
     d.line([(pad + 20) * S, ytop, x * S, ytop], fill=INK, width=lw)
     for b in blocks:
         bwid = bwidth(b)
         if isinstance(b, str):
-            d.line([x * S, ytop, (x + bwid) * S, ytop], fill=INK, width=lw)
-            box((x + bwid / 2) * S, ytop, b)
+            part(x * S, (x + bwid) * S, ytop, b)
         else:
             xl, xr = x * S, (x + bwid) * S
             for k, br in enumerate(b):
-                yy = ytop + k * (bh + gap) * S
-                d.line([xl, yy, xr, yy], fill=INK, width=lw)
+                yy = ytop + k * (BH + gap) * S
+                step = bwid / len(br)
                 for j, lab in enumerate(br):
-                    box((x + LEAD + j * (bw + LEAD) + bw / 2) * S, yy, lab)
-            d.line([xl, ytop, xl, ytop + (len(b) - 1) * (bh + gap) * S], fill=INK, width=lw)
-            d.line([xr, ytop, xr, ytop + (len(b) - 1) * (bh + gap) * S], fill=INK, width=lw)
-        x += bwid + gap
+                    part(x * S + j * step * S, x * S + (j + 1) * step * S, yy, lab)
+            d.line([xl, ytop, xl, ytop + (len(b) - 1) * (BH + gap) * S], fill=INK, width=lw)
+            d.line([xr, ytop, xr, ytop + (len(b) - 1) * (BH + gap) * S], fill=INK, width=lw)
+        x += bwid
+        d.line([x * S, ytop, (x + gap) * S, ytop], fill=INK, width=lw)   # สายเชื่อมระหว่างบล็อก
+        x += gap
     d.line([(x - gap) * S, ytop, (W - pad - 20) * S, ytop], fill=INK, width=lw)
     d.line([(W - pad - 20) * S, ytop, (W - pad - 20) * S, ybot], fill=INK, width=lw)
     d.line([(pad + 20) * S, ytop, (pad + 20) * S, ybot], fill=INK, width=lw)
     d.line([(pad + 20) * S, ybot, (W - pad - 20) * S, ybot], fill=INK, width=lw)
-    cx = W / 2 * S                                    # แบตเตอรี่อยู่กลางเส้นล่าง
+    cx = W / 2 * S
     d.line([cx - 5 * S, ybot - 11 * S, cx - 5 * S, ybot + 11 * S], fill=INK, width=lw)
     d.line([cx + 5 * S, ybot - 6 * S, cx + 5 * S, ybot + 6 * S], fill=INK, width=max(2, S * 2))
     d.rectangle([cx - 5 * S, ybot - lw, cx + 5 * S, ybot + lw], fill="white")
     if emf:
         d.text((cx - d.textlength(emf, font=f) / 2, ybot + 14 * S), emf, font=f, fill=INK)
     return _save(im, W, H, name)
+
+
+def bridge(labels, name, emf=None, arm=92, pad=20):
+    """วงจรบริดจ์ (วีตสโตน) — labels = (บนซ้าย, บนขวา, ล่างซ้าย, ล่างขวา, กลาง)
+
+    สี่เหลี่ยมข้าวหลามตัด มีตัวต้านทานสี่แขน และมีมิเตอร์คาดกลาง
+    บริดจ์สมดุลเมื่อ (บนซ้าย)(ล่างขวา) = (บนขวา)(ล่างซ้าย) ซึ่งตอนนั้นมิเตอร์อ่านค่าศูนย์
+    เด็กที่ไม่รู้เงื่อนไขนี้จะไปนั่งย่อวงจรแบบอนุกรม-ขนาน ซึ่งย่อไม่ได้
+    """
+    W, H = int(arm * 2 + pad * 2 + 56), int(arm * 2 + pad * 2 + 46)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    f = font(12, True)
+    cx, cy = W / 2 * S, (pad + arm) * S
+    L = (cx - arm * S, cy)
+    R = (cx + arm * S, cy)
+    T = (cx, cy - arm * 0.72 * S)
+    B = (cx, cy + arm * 0.72 * S)
+
+    def limb(p, q, lab):
+        d.line([p, q], fill=INK, width=lw)
+        mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
+        r = 13 * S
+        d.ellipse([mx - r, my - r, mx + r, my + r], fill="white", outline="white")
+        d.line([mx - r, my - r * 0.0, mx + r, my], fill=INK, width=lw)
+        _zig(d, mx - 22 * S, mx + 22 * S, my, lw, n=4, amp=5)
+        d.rectangle([mx - 12 * S, my - 20 * S, mx + 12 * S, my - 6 * S], fill="white")
+        d.text((mx - d.textlength(lab, font=f) / 2, my - 22 * S), lab, font=f, fill=INK)
+
+    for p, q, lab in ((L, T, labels[0]), (T, R, labels[1]),
+                      (L, B, labels[2]), (B, R, labels[3])):
+        d.line([p, q], fill=INK, width=lw)
+    for p, q, lab in ((L, T, labels[0]), (T, R, labels[1]),
+                      (L, B, labels[2]), (B, R, labels[3])):
+        mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
+        d.rectangle([mx - 20 * S, my - 9 * S, mx + 20 * S, my + 9 * S], fill="white")
+        _zig(d, mx - 20 * S, mx + 20 * S, my, lw, n=4, amp=5)
+        d.text((mx - d.textlength(lab, font=f) / 2, my - 27 * S), lab, font=f, fill=INK)
+    d.line([T, B], fill=INK, width=lw)                     # แขนกลางที่มีมิเตอร์
+    gr = 13 * S
+    d.ellipse([cx - gr, cy - gr, cx + gr, cy + gr], fill="white", outline=INK, width=lw)
+    d.text((cx - d.textlength(labels[4], font=f) / 2, cy - 9 * S), labels[4], font=f, fill=INK)
+    yb = (pad + arm * 2 + 14) * S
+    d.line([L[0], L[1], L[0], yb], fill=INK, width=lw)
+    d.line([R[0], R[1], R[0], yb], fill=INK, width=lw)
+    d.line([L[0], yb, R[0], yb], fill=INK, width=lw)
+    d.line([cx - 5 * S, yb - 11 * S, cx - 5 * S, yb + 11 * S], fill=INK, width=lw)
+    d.line([cx + 5 * S, yb - 6 * S, cx + 5 * S, yb + 6 * S], fill=INK, width=max(2, S * 2))
+    d.rectangle([cx - 5 * S, yb - lw, cx + 5 * S, yb + lw], fill="white")
+    if emf:
+        d.text((cx - d.textlength(emf, font=f) / 2, yb + 12 * S), emf, font=f, fill=INK)
+    return _save(im, W, H, name)
+
+
+def _switch(d, x, y, lw, lab, f, up=16, below=False):
+    """สวิตช์เปิดอยู่ — ขาโยกกางขึ้น วาดเปิดเสมอ เพราะโจทย์ถามว่าต้องปิดตัวไหน"""
+    r = 3 * S
+    d.ellipse([x - 13 * S - r, y - r, x - 13 * S + r, y + r], fill=INK)
+    d.ellipse([x + 13 * S - r, y - r, x + 13 * S + r, y + r], fill=INK)
+    d.line([x - 13 * S, y, x + 9 * S, y - up * S], fill=INK, width=lw)
+    ly = y + 6 * S if below else y - (up + 20) * S
+    d.text((x - d.textlength(lab, font=f) / 2, ly), lab, font=f, fill=INK)
+
+
+def _bulb(d, x, y, lw, lab, f, r=13):
+    """หลอดไฟ — วงกลมมีกากบาทข้างใน ตามสัญลักษณ์มาตรฐาน"""
+    rr = r * S
+    d.ellipse([x - rr, y - rr, x + rr, y + rr], fill="white", outline=INK, width=lw)
+    k = rr * 0.70
+    d.line([x - k, y - k, x + k, y + k], fill=INK, width=lw)
+    d.line([x - k, y + k, x + k, y - k], fill=INK, width=lw)
+    d.text((x - d.textlength(lab, font=f) / 2, y + rr + 3 * S), lab, font=f, fill=INK)
+
+
+def switchboard(sw, bulbs, name, emf="E", pad=20):
+    """วงจรหลอดไฟกับสวิตช์ — โครงตายตัวหนึ่งแบบ ใช้ถามว่าต้องปิดสวิตช์ตัวใดบ้าง
+
+    โครง (S0 เป็นสวิตช์ประธานอยู่บนสายหลัก)
+      สาขาบน   S1 อนุกรมกับหลอด L1
+      สาขาล่าง S3 อนุกรมกับหลอด L2 แล้วต่อกับ (L3 ขนานกับ S2)
+
+    จุดที่ทำให้ข้อนี้ไม่ง่าย คือ **S2 คร่อมหลอด L3** ปิด S2 แล้ว L3 จะดับ ไม่ใช่ติด
+    เพราะกระแสลัดผ่านสวิตช์แทนที่จะผ่านไส้หลอด เด็กที่คิดว่าปิดสวิตช์ = หลอดติดจะพลาดข้อนี้
+    """
+    W, H = 344, 212
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    f = font(12, True)
+    XL, XR = (pad + 14) * S, (W - pad - 14) * S
+    Y1, Y2 = (pad + 30) * S, (pad + 94) * S
+    YB = (H - pad - 8) * S
+    d.line([XL, Y1, XR, Y1], fill=INK, width=lw)          # สาขาบน
+    _switch(d, XL + 62 * S, Y1, lw, sw[1], f)
+    _bulb(d, XL + 168 * S, Y1, lw, bulbs[0], f)
+    d.line([XL, Y2, XR, Y2], fill=INK, width=lw)          # สาขาล่าง
+    _switch(d, XL + 44 * S, Y2, lw, sw[3], f)
+    _bulb(d, XL + 116 * S, Y2, lw, bulbs[1], f)
+    xa, xb = XL + 156 * S, XL + 238 * S                   # ท่อนที่ L3 ขนานกับ S2
+    ymid = Y2
+    ylow = Y2 + 38 * S
+    _bulb(d, (xa + xb) / 2, ymid, lw, bulbs[2], f)
+    d.line([xa, ymid, xa, ylow], fill=INK, width=lw)
+    d.line([xb, ymid, xb, ylow], fill=INK, width=lw)
+    d.line([xa, ylow, xb, ylow], fill=INK, width=lw)
+    _switch(d, (xa + xb) / 2, ylow, lw, sw[2], f, up=13, below=True)
+    d.line([XL, Y1, XL, Y2], fill=INK, width=lw)
+    d.line([XR, Y1, XR, Y2], fill=INK, width=lw)
+    d.line([XL, Y2, XL, YB], fill=INK, width=lw)          # สายหลักลงไปหาแบตเตอรี่
+    d.line([XR, Y2, XR, YB], fill=INK, width=lw)
+    d.line([XL, YB, XR, YB], fill=INK, width=lw)
+    _switch(d, XL + 62 * S, YB, lw, sw[0], f, up=14)
+    cx = XR - 56 * S
+    d.line([cx - 5 * S, YB - 11 * S, cx - 5 * S, YB + 11 * S], fill=INK, width=lw)
+    d.line([cx + 5 * S, YB - 6 * S, cx + 5 * S, YB + 6 * S], fill=INK, width=max(2, S * 2))
+    d.rectangle([cx - 5 * S, YB - lw, cx + 5 * S, YB + lw], fill="white")
+    d.text((cx - d.textlength(emf, font=f) / 2, YB + 14 * S), emf, font=f, fill=INK)
+    return _save(im, W, H, name)
+
+
+def bulb_states(s0, s1, s2, s3):
+    """สถานะหลอด (L1, L2, L3) จากสถานะสวิตช์ — True คือปิดสวิตช์ / หลอดติด
+
+    L3 ดับเมื่อ S2 ปิด เพราะกระแสลัดผ่านสวิตช์ที่คร่อมอยู่
+    """
+    power = s0
+    return (power and s1, power and s3, power and s3 and not s2)

@@ -11,10 +11,15 @@ LV = [1]                      # ระดับความยากของก
 
 def setlv(n): LV[0] = n
 
-def add(part, arche, stem, choices, ansIdx, img=None, optimg=None, lvl=None):
+def add(part, arche, stem, choices, ansIdx, img=None, optimg=None, lvl=None, why=None):
+    """why = คำอธิบายสั้น ๆ หรือสูตร พิมพ์เฉพาะในฉบับครู
+
+    ต้องสั้นจริง ๆ ระดับที่ครูกวาดตาผ่านแล้วนึกออกทันทีว่าข้อนี้ใช้อะไร
+    ไม่ใช่วิธีทำเต็ม ถ้ายาวเกินสองบรรทัดแปลว่าเขียนผิดวัตถุประสงค์
+    """
     QS.append({"part": part, "arche": arche, "stem": stem,
                "choices": [str(c) for c in choices], "ansIdx": ansIdx,
-               "img": img, "optimg": optimg, "lvl": lvl or LV[0]})
+               "img": img, "optimg": optimg, "lvl": lvl or LV[0], "why": why})
 
 def numch(ans, seed, spread=None):
     rng = random.Random(seed * 7919 + ans * 31 + SEED * 104729)
@@ -26,9 +31,9 @@ def numch(ans, seed, spread=None):
     out = sorted(below[:t] + above[:4-t] + [ans])
     return out, out.index(ans)
 
-def addnum(part, arche, stem, ans, spread=None, img=None, lvl=None):
+def addnum(part, arche, stem, ans, spread=None, img=None, lvl=None, why=None):
     c, i = numch(ans, len(QS) + 1, spread)
-    add(part, arche, stem, c, i, img=img, lvl=lvl)
+    add(part, arche, stem, c, i, img=img, lvl=lvl, why=why)
 
 # ==================================================================
 # พาร์ทที่ 1 — ความสามารถทางตัวเลข (25 ข้อ)
@@ -641,8 +646,12 @@ P3 = "พาร์ทที่ 3"
 import mech
 mech.build(add, P3, random.Random(8100 + SEED * 104729))
 
+P4 = "พาร์ทที่ 4"
 import concept
-concept.build(add, P3)
+concept.build(add, P3, P4)
+
+import physics
+physics.build(add, P4, random.Random(8300 + SEED * 104729))
 
 import numeric
 numeric.build(add, P1, random.Random(6100 + SEED * 104729))
