@@ -697,7 +697,7 @@ def gears(nodes, name, names=None, spin=None, angles=None, unit=2.0, pad=18):
     return _save(im, W, H, name)
 
 
-def beam(marks, name, span=8, unit=17, pad=14):
+def beam(marks, name, span=8, unit=17, pad=14, dimq=None):
     """คานบนจุดหมุนสามเหลี่ยม — marks = [(ตำแหน่งนับเป็นขีด, ป้าย)] ลบคือฝั่งซ้าย
 
     **ไม่พิมพ์ตัวเลขระยะกำกับ** วาดขีดห่างเท่า ๆ กันบนคานให้นับเอาเอง
@@ -705,10 +705,14 @@ def beam(marks, name, span=8, unit=17, pad=14):
 
     ผู้เรียกต้องเว้นตำแหน่งให้ห่างกันอย่างน้อย 2 ขีด ไม่งั้นกล่องน้ำหนักจะซ้อนกัน
     (2 ขีด = 34 จุด ส่วนกล่องกว้าง 30 จุด)
+
+    dimq = ดัชนีของก้อนที่ *ระยะ* เป็นสิ่งที่โจทย์ถาม จะลากเส้นบอกระยะจากจุดหมุนไปหาก้อนนั้น
+    แล้วติดเครื่องหมายคำถามไว้บนเส้น ไม่ใช่ในกล่อง
+    เพราะถ้าใส่ ? ไว้ในกล่องทั้งที่โจทย์บอกมวลมาแล้ว คนอ่านจะนึกว่าตำแหน่งก้อนถูกตรึงไว้แล้ว
     """
     BW = 15
     W = int(span * 2 * unit + pad * 2 + BW * 2)
-    H = int(pad * 2 + 92)
+    H = int(pad * 2 + (112 if dimq is not None else 92))
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
     lw = max(1, S)
@@ -728,6 +732,26 @@ def beam(marks, name, span=8, unit=17, pad=14):
         d.rectangle([X - BW * S, y0 - 24 * S, X + BW * S, y0],
                     fill="white" if lab == "?" else TOPF, outline=INK, width=lw)
         d.text((X - d.textlength(lab, font=f) / 2, y0 - 20 * S), lab, font=f, fill=INK)
+    if dimq is not None:
+        X = mid + marks[dimq][0] * unit * S
+        yd = y0 + 44 * S
+        d.line([mid, y0 + 32 * S, mid, yd + 5 * S], fill=LINEG, width=lw)
+        d.line([X, y0 + 7 * S, X, yd + 5 * S], fill=LINEG, width=lw)
+        d.line([mid, yd, X, yd], fill=INK, width=lw)
+        for xe, sgn in ((mid, 1), (X, -1 if X > mid else 1)):
+            pass
+        for xe in (mid, X):
+            sgn = 1 if xe < X else -1
+            if xe == X:
+                sgn = -1 if X > mid else 1
+            d.polygon([(xe, yd), (xe + sgn * 7 * S, yd - 4 * S),
+                       (xe + sgn * 7 * S, yd + 4 * S)], fill=INK)
+        qm = "?"
+        tw = d.textlength(qm, font=f)
+        cxq = (mid + X) / 2
+        d.rectangle([cxq - tw / 2 - 4 * S, yd - 11 * S, cxq + tw / 2 + 4 * S, yd + 11 * S],
+                    fill="white")
+        d.text((cxq - tw / 2, yd - 9 * S), qm, font=f, fill=INK)
     return _save(im, W, H, name)
 
 
@@ -800,6 +824,75 @@ def pulley(n, name, load="W", unit=26, pad=14, mirror=False):
     return _save(im, W, H, name)
 
 
+def pulleystack(k, name, load="W", pad=16, dx=44, dy=40):
+    """รอกผสม (รอกทวีกำลัง) — รอกเคลื่อนที่ k ตัวเรียงเป็นชั้น แรงลดครึ่งหนึ่งทุกชั้น
+
+    การผูก: เชือกของรอกชั้นล่างสุดรับน้ำหนัก ปลายข้างหนึ่งยึดเพดาน
+    ปลายอีกข้างไปผูกที่ *เพลา* ของรอกชั้นถัดขึ้นไป ทำให้แรงถูกหารสองอีกครั้งทุกชั้น
+    ผลคือ F = W / 2^k **ไม่ใช่** W / 2k ซึ่งเป็นกับดักหลักของแนวนี้
+
+    ต่างจาก pulley() ที่เป็นรอกพวงชุดเดียว แรงหารด้วยจำนวนเส้นเชือกตรง ๆ
+    """
+    RS, WRAP = 9, 13
+    W = int(pad * 2 + dx * (k - 1) + 96)
+    H = int(pad * 2 + dy * (k - 1) + 132)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    f = font(14, True)
+    yc = (pad + 12) * S                                  # ใต้เพดาน
+    d.rectangle([pad * S, (pad + 1) * S, (W - pad) * S, yc], fill=LEFTF, outline=INK, width=lw)
+    cx = [(pad + 26 + i * dx) * S for i in range(k)]
+    cy = [(pad + 96 + dy * (k - 1) - i * dy) * S for i in range(k)]
+    for i in range(k):
+        xl, xr = cx[i] - WRAP * S, cx[i] + WRAP * S
+        d.arc([xl, cy[i] - WRAP * S, xr, cy[i] + WRAP * S], 0, 180, fill=INK, width=lw)
+        d.line([xl, yc, xl, cy[i]], fill=INK, width=lw)  # เส้นซ้าย ขึ้นไปยึดเพดาน
+        d.ellipse([xl - 4 * S, yc, xl + 4 * S, yc + 8 * S], fill="white", outline=INK, width=lw)
+        if i + 1 < k:                                    # เส้นขวา ไปผูกเพลาของรอกชั้นบน
+            d.line([xr, cy[i], cx[i + 1], cy[i + 1]], fill=INK, width=lw)
+        d.ellipse([cx[i] - RS * S, cy[i] - RS * S, cx[i] + RS * S, cy[i] + RS * S],
+                  fill=TOPF, outline=INK, width=lw)
+        d.ellipse([cx[i] - 2 * S, cy[i] - 2 * S, cx[i] + 2 * S, cy[i] + 2 * S], fill=INK)
+    bw = 34 * S
+    d.line([cx[0], cy[0] + RS * S, cx[0], cy[0] + 26 * S], fill=INK, width=lw)
+    d.rectangle([cx[0] - bw / 2, cy[0] + 26 * S, cx[0] + bw / 2, cy[0] + 50 * S],
+                fill=TOPF, outline=INK, width=lw)
+    d.text((cx[0] - d.textlength(load, font=f) / 2, cy[0] + 30 * S), load, font=f, fill=INK)
+    fx = cx[-1] + (WRAP + 30) * S                        # ปลายเชือกชั้นบนสุด
+    d.line([cx[-1] + WRAP * S, cy[-1], fx, cy[-1]], fill=INK, width=lw)
+    d.line([fx, cy[-1], fx, cy[-1] + 34 * S], fill=INK, width=lw)
+    d.polygon([(fx, cy[-1] + 44 * S), (fx - 6 * S, cy[-1] + 31 * S),
+               (fx + 6 * S, cy[-1] + 31 * S)], fill=INK)
+    d.text((fx - d.textlength("F", font=f) / 2, cy[-1] + 48 * S), "F", font=f, fill=INK)
+    return _save(im, W, H, name)
+
+
+def _tickstep(vals, lo=4, hi=12):
+    """เลือกระยะขีดที่ *ทุกค่าสำคัญตกลงบนขีดพอดี*
+
+    บั๊กเดิม: ใช้ round(max/5) เป็นระยะขีด ทำให้จุดยอดของกราฟลอยอยู่ระหว่างขีด
+    เด็กรู้วิธีทำแต่หาค่าที่จะเอาไปคำนวณไม่ได้ ซึ่งเป็นโจทย์ที่ใช้ไม่ได้เลย
+
+    วิธีแก้: ระยะขีดต้องเป็นตัวหารร่วมของทุกค่าที่พล็อต จากตัวหารทั้งหมดของ ห.ร.ม.
+    เลือกตัวที่ทำให้จำนวนขีดอยู่ในช่วงที่อ่านสบาย
+    """
+    from math import gcd
+    nz = [int(v) for v in vals if v]
+    mx = max([int(v) for v in vals] + [1])
+    if not nz:
+        return 1
+    g = nz[0]
+    for v in nz[1:]:
+        g = gcd(g, v)
+    divs = sorted(d for d in range(1, g + 1) if g % d == 0)
+    ok = [d for d in divs if lo <= mx // d <= hi]
+    if ok:
+        return max(ok)                      # เส้นน้อยที่สุดที่ยังอ่านสบาย
+    fit = [d for d in divs if mx // d <= hi]
+    return max(fit) if fit else 1
+
+
 def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=True):
     """กราฟความเร็ว-เวลาแบบเส้นตรงต่อกัน — pts = [(t, v), ...] เรียงตามเวลา
 
@@ -817,8 +910,8 @@ def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=
     Y = lambda v: (pad + h - v / mv * h) * S
     fs = font(11, False)
     fl = font(11, True)
-    tstep = max(1, round(mt / 6))
-    vstep = max(1, round(mv / 5))
+    tstep = _tickstep([p[0] for p in pts])
+    vstep = _tickstep([p[1] for p in pts])
     if grid:
         for t in range(0, int(mt) + 1, tstep):
             d.line([X(t), Y(0), X(t), Y(mv)], fill=(232, 238, 239), width=lw)
@@ -842,6 +935,40 @@ def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=
     for p in xy:
         d.ellipse([p[0] - 2 * S, p[1] - 2 * S, p[0] + 2 * S, p[1] + 2 * S], fill=(0, 140, 140))
     return _save(im, W, H, name)
+
+
+def _ohm(d, x, y, h, lw):
+    """วาดอักขระโอห์มเอง เพราะฟอนต์ Sarabun ไม่มีอักขระนี้ (จะขึ้นเป็นกล่องว่าง)
+
+    (x, y) คือมุมซ้ายบนของกรอบตัวอักษร h คือความสูง
+    คืนความกว้างที่ใช้ไป เพื่อให้ผู้เรียกจัดกลางได้
+    """
+    r = h * 0.46
+    cx, cy = x + r, y + r + h * 0.04
+    d.arc([cx - r, cy - r, cx + r, cy + r], 146, 394, fill=INK, width=max(lw, 2))
+    import math
+    for a, sgn in ((146, -1), (394, 1)):
+        px = cx + math.cos(math.radians(a)) * r
+        py = cy + math.sin(math.radians(a)) * r
+        d.line([px, py, px + sgn * r * 0.62, py + r * 0.34], fill=INK, width=max(lw, 2))
+    return r * 2.4
+
+
+def ohmlabel(d, cx, y, num, f, lw):
+    """พิมพ์ค่าความต้านทานพร้อมหน่วยโอห์ม จัดกลางที่ cx
+
+    วัดกรอบจริงของตัวเลขด้วย textbbox แล้ววางอักขระโอห์มให้สูงเท่ากันและนั่งบนเส้นบรรทัดเดียวกัน
+    ถ้ากะจากขนาดฟอนต์ตรง ๆ อักขระจะลอยสูงกว่าตัวเลข เพราะ Sarabun เผื่อที่ด้านบนไว้มาก
+    """
+    txt = str(num) + " "
+    tw = d.textlength(txt, font=f)
+    bb = d.textbbox((0, 0), str(num), font=f)      # (x0, y0, x1, y1) ของตัวเลขจริง
+    top, bot = bb[1], bb[3]
+    oh = bot - top
+    ow = oh * 1.30
+    x0 = cx - (tw + ow) / 2
+    d.text((x0, y), txt, font=f, fill=INK)
+    _ohm(d, x0 + tw, y + top, oh, lw)
 
 
 def _zig(d, x1, x2, y, lw, n=6, amp=7):
@@ -890,7 +1017,7 @@ def circuit(blocks, name, emf=None, bw=54, gap=22, pad=16):
 
     def part(xa, xb, y, lab):
         _zig(d, xa, xb, y, lw)
-        d.text(((xa + xb) / 2 - d.textlength(lab, font=f) / 2, y - 24 * S), lab, font=f, fill=INK)
+        ohmlabel(d, (xa + xb) / 2, y - 26 * S, lab, f, lw)
 
     d.line([(pad + 20) * S, ytop, x * S, ytop], fill=INK, width=lw)
     for b in blocks:
@@ -958,7 +1085,10 @@ def bridge(labels, name, emf=None, arm=92, pad=20):
         mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
         d.rectangle([mx - 20 * S, my - 9 * S, mx + 20 * S, my + 9 * S], fill="white")
         _zig(d, mx - 20 * S, mx + 20 * S, my, lw, n=4, amp=5)
-        d.text((mx - d.textlength(lab, font=f) / 2, my - 27 * S), lab, font=f, fill=INK)
+        if lab == "?":
+            d.text((mx - d.textlength(lab, font=f) / 2, my - 29 * S), lab, font=f, fill=INK)
+        else:
+            ohmlabel(d, mx, my - 29 * S, lab, f, lw)
     d.line([T, B], fill=INK, width=lw)                     # แขนกลางที่มีมิเตอร์
     gr = 13 * S
     d.ellipse([cx - gr, cy - gr, cx + gr, cy + gr], fill="white", outline=INK, width=lw)

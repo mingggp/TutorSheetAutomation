@@ -19,6 +19,8 @@ import random
 import draw as D
 
 CH = "กขคงจ"
+CH2 = "กขคงจฉชซฌญฎฏฐ"
+NLC = chr(10)
 DIRW = {True: "ตามเข็มนาฬิกา", False: "ทวนเข็มนาฬิกา"}
 
 
@@ -73,6 +75,27 @@ def pulley_rope_q(rng, want=0, n=None):
     return nn, h, [str(x) for x in o], o.index(truth)
 
 
+def pulley_stack_q(rng, want=0, k=None):
+    """รอกผสม — แรงลดครึ่งหนึ่งทุกชั้น F = W / 2^k
+
+    กับดักหลักคือเด็กที่คิดว่าแรงลดแบบบวกกัน จะได้ W/(2k) ซึ่งผิด
+    ตัวลวงตัวนั้นต้องอยู่ในตัวเลือกเสมอ ยกเว้นกรณีที่มันชนกับคำตอบพอดี
+    """
+    kk = k or rng.choice([2, 3])
+    for W in rng.sample([160, 240, 320, 480, 640, 960], 6):
+        m = 2 ** kk
+        if W % m or W % (2 * kk):
+            continue
+        truth = W // m
+        wrong = [W // (2 * kk), W // 2, W // kk if W % kk == 0 else None,
+                 W // (m // 2), W // (m * 2) if W % (m * 2) == 0 else None, W]
+        o = _opts(truth, [w for w in wrong if w and w != truth], want)
+        if not o:
+            continue
+        return kk, W, [str(x) for x in o], o.index(truth)
+    return None
+
+
 # ================================================================ ชุดเฟือง
 def gear_dirs(teeth, drive, cwise):
     """เฟืองที่ขบกันหมุนสวนทางเสมอ ทิศจึงสลับทีละตัวไปตามแถว"""
@@ -80,7 +103,8 @@ def gear_dirs(teeth, drive, cwise):
 
 
 def gear_dir_q(rng, want=0, k=4):
-    teeth = rng.sample([10, 12, 15, 16, 18, 20, 24, 25, 30, 36], k)
+    pool = [10, 12, 15, 16, 18, 20, 24, 25, 30, 36, 14, 21, 28, 33]
+    teeth = rng.sample(pool, k)
     drive = rng.randrange(k)
     cwise = rng.random() < .5
     real = gear_dirs(teeth, drive, cwise)
@@ -98,7 +122,10 @@ def gear_dir_q(rng, want=0, k=4):
     if len(opts) < 5:
         return None
     # วางเฉียงสลับขึ้นลง ให้หน้าตาต่างจากแถวตรง และบังคับให้เด็กไล่ทิศทีละคู่จริง ๆ
-    angles = [rng.choice([-38, -26, 0, 26, 38]) for _ in range(k - 1)]
+    # แถวยาววางซิกแซกขึ้นลง เพื่อไม่ให้เดาทิศจากตำแหน่งซ้ายขวาได้
+    angles = [rng.choice([-40, -28, 0, 28, 40]) for _ in range(k - 1)]
+    if k > 6:
+        angles = [(-1) ** i * rng.choice([26, 34, 42]) for i in range(k - 1)]
     opts, _ = _place(opts, truth, want)
     return teeth, drive, cwise, ask, angles, opts, opts.index(truth)
 
@@ -197,19 +224,30 @@ def _par(vals):
     return F(1) / sum(F(1, v) for v in vals)
 
 
-def circuit_q(rng, want=0, kind=None):
+def circuit_q(rng, want=0, kind=None, hard=False):
     kind = kind or rng.choice(["r", "i"])
     for _ in range(600):
         a, b, c = (rng.choice([2, 3, 4, 6, 8, 12]) for _ in range(3))
-        shape = rng.choice(["ps", "sp", "bp", "pss"])
+        d_, e_ = (rng.choice([2, 3, 4, 6, 8, 12]) for _ in range(2))
+        shape = rng.choice(["deep", "nest", "twin"] if hard else ["ps", "sp", "bp", "pss"])
         if shape == "ps":
             blocks, R = [[[str(a)], [str(b)]], str(c)], _par([a, b]) + c
         elif shape == "sp":
             blocks, R = [str(a), [[str(b)], [str(c)]]], a + _par([b, c])
         elif shape == "bp":
             blocks, R = [[[str(a), str(b)], [str(c)]]], _par([a + b, c])
-        else:
+        elif shape == "pss":
             blocks, R = [[[str(a)], [str(b)]], str(c), str(c)], _par([a, b]) + 2 * c
+        elif shape == "deep":
+            # ขนานสองกลุ่มต่ออนุกรมกัน กลุ่มแรกมีสาขาที่เป็นอนุกรมสองตัว ต้องย่อสามขั้น
+            blocks = [[[str(a), str(b)], [str(c)]], [[str(d_)], [str(e_)]]]
+            R = _par([a + b, c]) + _par([d_, e_])
+        elif shape == "nest":
+            blocks = [[[str(a)], [str(b)]], [[str(c)], [str(d_)]], str(e_)]
+            R = _par([a, b]) + _par([c, d_]) + e_
+        else:
+            blocks = [str(a), [[str(b), str(c)], [str(d_), str(e_)]]]
+            R = a + _par([b + c, d_ + e_])
         naive = a + b + c
         if R.denominator != 1 or R < 2:
             continue
@@ -375,6 +413,20 @@ def build(add, P3, rng):
             why=f"F = W/n · นับเส้นเชือกที่พาดขึ้นจากรอกล่างได้ {nn} เส้น")
         nxt()
 
+    for qi, k in enumerate([3, 2]):            # ★★★ รอกผสม แรงลดเป็นทวีคูณ
+        r = pulley_stack_q(rng, want=want, k=k)
+        if not r:
+            continue
+        kk, W, opts, idx = r
+        add(P3, "รอกผสม",
+            f"รอกผสมดังรูปประกอบด้วยรอกเคลื่อนที่ {kk} ตัวเรียงเป็นชั้น\n"
+            f"เชือกของแต่ละชั้นยึดเพดานไว้ข้างหนึ่ง อีกข้างผูกกับเพลาของรอกชั้นถัดขึ้นไป\n"
+            f"ถ้าวัตถุหนัก {W} นิวตัน เชือกและรอกเบามาก ไม่มีความฝืด\n"
+            "ต้องออกแรง F อย่างน้อยกี่นิวตัน",
+            opts, idx, img=D.pulleystack(kk, f"pst{qi}"), lvl=3,
+            why=f"แรงลดครึ่งหนึ่งทุกชั้น F = W/2^{kk} = {W}/{2 ** kk} · ไม่ใช่ W/{2 * kk}")
+        nxt()
+
     for qi, n in enumerate([3, 5]):
         r = pulley_rope_q(rng, want=want, n=n)
         if not r:
@@ -454,8 +506,8 @@ def build(add, P3, rng):
         nxt()
 
     # ---- วงจรไฟฟ้า
-    for qi, kind in enumerate(["r", "i"]):
-        r = circuit_q(rng, want=want, kind=kind)
+    for qi, (kind, hard) in enumerate([("r", True), ("i", True)]):
+        r = circuit_q(rng, want=want, kind=kind, hard=hard)
         if not r:
             continue
         blocks, R, V, opts, idx, kind = r
@@ -463,8 +515,7 @@ def build(add, P3, rng):
              else "กระแสไฟฟ้าที่ไหลผ่านแบตเตอรี่มีค่ากี่แอมแปร์")
         add(P3, "วงจรไฟฟ้า",
             "ตัวเลขที่กำกับตัวต้านทานแต่ละตัวในรูปมีหน่วยเป็นโอห์ม\n" + q,
-            opts, idx, img=D.circuit(blocks, f"ck{qi}", emf=f"{V} V"),
-            lvl=2 if kind == "r" else 3,
+            opts, idx, img=D.circuit(blocks, f"ck{qi}", emf=f"{V} V"), lvl=3,
             why="ย่อขนานก่อนแล้วบวกอนุกรม" + ("" if kind == "r" else f" · I = V/R = {V}/{R}"))
         nxt()
 
@@ -542,6 +593,15 @@ if __name__ == "__main__":
                 n += 1
                 nn, h, o, i = r
                 ck(int(o[i]) == nn * h, f"รอกเชือก s={s}")
+
+            r = pulley_stack_q(rng, want=w)
+            if r:
+                n += 1
+                kk, W, o, i2 = r
+                ck(int(o[i2]) * (2 ** kk) == W, f"รอกผสม s={s}: เฉลยไม่ใช่ W/2^k")
+                ck(len(set(o)) == 5, f"รอกผสม s={s}: ตัวเลือกซ้ำ")
+                ck(str(W // (2 * kk)) in o or W // (2 * kk) == W // (2 ** kk),
+                   f"รอกผสม s={s}: ตัวลวงแบบบวกกันหายไป")
 
             r = gear_dir_q(rng, want=w)
             if r:

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 REM  ออกชีทครบชุด: นักเรียน + ครู เป็น PDF
@@ -25,11 +25,19 @@ REM  ชื่อวิชาตัวใหญ่
 set UP=%SUBJ%
 if "%SUBJ%"=="tpat3" set UP=TPAT3
 if "%SUBJ%"=="tgat2" set UP=TGAT2
-if "%SUBJ%"=="tpat3phys" set UP=TPAT3 ฟิสิกส์
+if "%SUBJ%"=="tpat3phys" set UP=TPAT3
 
-set DIR=out\%UP% %LV%
-set STU=%DIR%\[%UP%] %LV%
-set KEY=%DIR%\[%UP%] %LV% Key
+REM  ชื่อวีค ใช้ในชื่อโฟลเดอร์และชื่อไฟล์
+set WK=คณิต
+if "%SUBJ%"=="tpat3phys" set WK=ฟิสิกส์
+if "%SUBJ%"=="tgat2" set WK=เหตุผล
+
+REM  รูปแบบชื่อ: [วิชา] วีค ชุดที่ N  ระดับความยากไม่อยู่ในชื่อแล้ว
+REM  ดาวยังพิมพ์อยู่บนหัวกระดาษในตัวไฟล์เหมือนเดิม
+set NAME=[%UP%] %WK% ชุดที่ %SETNO%
+set DIR=out\%NAME%
+set STU=%DIR%\%NAME%
+set KEY=%DIR%\%NAME% Key
 if not exist "%DIR%" mkdir "%DIR%"
 
 echo [1/4] สร้างคลังโจทย์ ...
