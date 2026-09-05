@@ -75,6 +75,32 @@ def pulley_rope_q(rng, want=0, n=None):
     return nn, h, [str(x) for x in o], o.index(truth)
 
 
+def pulley_heavy_q(rng, want=0, n=None):
+    """รอกที่ชุดรอกล่างมีน้ำหนัก — F = (W + Wp) / n
+
+    ข้อรอกพื้นฐานที่บอกว่ารอกเบามาก เด็กแทนสูตรได้ทันทีโดยไม่ต้องคิด
+    พอชุดรอกล่างมีน้ำหนัก ต้องรู้ก่อนว่าน้ำหนักนั้นถูกเส้นเชือกชุดเดียวกันรับไว้ด้วย
+    ตัวลวงหลักคือ W/n ซึ่งมาจากการลืมบวกน้ำหนักรอก ต้องมีในตัวเลือกเสมอ
+    """
+    nn = n or rng.choice([3, 4, 5, 6])
+    for _ in range(300):
+        W = rng.choice([120, 180, 240, 300, 360, 480])
+        Wp = rng.choice([30, 40, 60, 80, 90, 120])
+        if (W + Wp) % nn or W % nn:
+            continue
+        truth = (W + Wp) // nn
+        trap = W // nn
+        if truth == trap:
+            continue
+        wrong = [trap, (W + Wp) // (nn + 1) if (W + Wp) % (nn + 1) == 0 else None,
+                 Wp // nn if Wp % nn == 0 else None, truth * 2, W + Wp]
+        o = _opts(truth, [w for w in wrong if w], want)
+        if not o:
+            continue
+        return nn, W, Wp, [str(x) for x in o], o.index(truth), trap
+    return None
+
+
 def pulley_stack_q(rng, want=0, k=None):
     """รอกผสม — แรงลดครึ่งหนึ่งทุกชั้น F = W / 2^k
 
@@ -130,11 +156,80 @@ def gear_dir_q(rng, want=0, k=4):
     return teeth, drive, cwise, ask, angles, opts, opts.index(truth)
 
 
+def gear_tree_q(rng, want=0, k=10):
+    """ชุดเฟืองแตกกิ่งหลายทิศ ถามทิศของตัวที่อยู่ไกลกันที่สุดในโครง
+
+    ต่างจากแถวเรียงตรงที่กวาดตาไล่ได้ โครงแบบต้นไม้บังคับให้ไล่ทีละคู่จริง ๆ
+    กฎยังเดิม เฟืองที่ขบกันหมุนสวนทาง ทิศจึงสลับตามจำนวนเฟืองที่คั่นอยู่
+
+    วางเฟืองแบบสุ่มต้องตรวจการชนก่อนเสมอ ไม่งั้นเฟืองจะทับกันจนอ่านรูปไม่ออก
+    """
+    for _ in range(6000):
+        teeth = [rng.choice([10, 12, 14, 15, 16, 18, 20, 24]) for _ in range(k)]
+        parents = [-1] + [rng.randrange(max(0, i - 3), i) for i in range(1, k)]
+        angles = [rng.randrange(0, 360, 20) for _ in range(k - 1)]
+        cx, cy, rad, par = D.gear_positions(teeth, parents, angles)
+        bad = False
+        for i in range(k):
+            for j in range(i + 1, k):
+                if par[j] == i:
+                    continue
+                dx, dy = cx[i] - cx[j], cy[i] - cy[j]
+                if dx * dx + dy * dy < (rad[i] + rad[j] + 6) ** 2:
+                    bad = True
+                    break
+            if bad:
+                break
+        if bad:
+            continue
+        adj = {i: [] for i in range(k)}
+        for i in range(1, k):
+            adj[i].append(par[i])
+            adj[par[i]].append(i)
+
+        def hops(src):
+            seen, order = {src: 0}, [src]
+            for u in order:
+                for v in adj[u]:
+                    if v not in seen:
+                        seen[v] = seen[u] + 1
+                        order.append(v)
+            return seen
+
+        h0 = hops(0)
+        a = max(h0, key=lambda n: h0[n])
+        da = hops(a)
+        b = max(da, key=lambda n: da[n])       # ปลายสองข้างของเส้นทางที่ยาวที่สุด
+        if da[b] < k - 4:
+            continue
+        drive, dd = a, da
+        cwise = rng.random() < .5
+        others = sorted((n for n in range(k) if n not in (a, b)),
+                        key=lambda n: -dd[n])[:2]
+        pick = [b] + others
+        real = {n: (cwise if dd[n] % 2 == 0 else not cwise) for n in range(k)}
+        truth = tuple(real[n] for n in pick)
+        seen2, opts = {truth}, [truth]
+        for _ in range(300):
+            c = tuple(rng.random() < .5 for _ in pick)
+            if c in seen2:
+                continue
+            seen2.add(c)
+            opts.append(c)
+            if len(opts) == 5:
+                break
+        if len(opts) < 5:
+            continue
+        opts, _ = _place(opts, truth, want)
+        return (teeth, parents, angles, drive, cwise, pick, dd[b]), opts, opts.index(truth)
+    return None
+
+
 def gear_speed_q(rng, want=0, k=3):
     """อัตราเร็วของเฟืองปลายขึ้นกับเฟืองต้นกับปลายเท่านั้น เฟืองกลางไม่มีผล"""
     for _ in range(400):
         teeth = rng.sample([10, 12, 15, 20, 24, 30, 36, 40], k)
-        rpm = rng.choice([60, 90, 120, 150, 180, 240])
+        rpm = rng.choice([4, 6, 8, 9, 10, 12, 15])       # จำนวนรอบ ไม่ใช่รอบต่อนาที
         if (rpm * teeth[0]) % teeth[-1]:
             continue
         truth = rpm * teeth[0] // teeth[-1]
@@ -197,7 +292,7 @@ def beam_q(rng, want=0, ask="dist"):
     for _ in range(600):
         m1, d1 = rng.choice([2, 3, 4, 6, 8]), rng.randint(2, 7)
         m2, d2 = rng.choice([2, 3, 4, 6, 8]), rng.randint(2, 7)
-        if abs(d1 - d2) < 2:
+        if abs(d1 - d2) < 3:            # 2 ขีดยังชิดจนดูเหมือนกล่องติดกัน
             continue
         m3 = rng.choice([2, 3, 4, 6, 8, 12])
         tot = m1 * d1 + m2 * d2
@@ -400,18 +495,30 @@ def build(add, P3, rng):
         want = (want + 2) % 5
 
     # ---- ระบบรอก : บังคับให้จำนวนเส้นเชือกไม่ซ้ำกัน และสลับข้างรูป
-    for qi, n in enumerate([2, 4, 6]):
+    for qi, n in enumerate([2, 4]):
         r = pulley_q(rng, want=want, n=n)
         if not r:
             continue
         nn, W, opts, idx = r
-        add(P3, "ระบบรอก",
+        add(P3, "ระบบรอก · พื้นฐาน",
             f"ระบบรอกดังรูปใช้ยกวัตถุที่มีน้ำหนัก {W} นิวตัน เชือกและรอกเบามาก ไม่มีความฝืด\n"
             "ต้องออกแรง F อย่างน้อยกี่นิวตันจึงจะยกวัตถุขึ้นได้",
             opts, idx, img=D.pulley(nn, f"pl{qi}", mirror=qi % 2 == 1),
             lvl=1 if nn <= 3 else 2,
             why=f"F = W/n · นับเส้นเชือกที่พาดขึ้นจากรอกล่างได้ {nn} เส้น")
         nxt()
+
+    r = pulley_heavy_q(rng, want=want, n=6)    # ชุดรอกล่างมีน้ำหนัก ต้องบวกเข้าไปด้วย
+    if r:
+        nn, W, Wp, opts, idx, trap = r
+        add(P3, "ระบบรอก · มีน้ำหนักรอก",
+            f"ระบบรอกดังรูปใช้ยกวัตถุที่มีน้ำหนัก {W} นิวตัน" + NLC +
+            f"เชือกเบาและไม่มีความฝืด แต่ชุดรอกล่างทั้งชุดมีน้ำหนัก {Wp} นิวตัน" + NLC +
+            "ต้องออกแรง F อย่างน้อยกี่นิวตันจึงจะยกวัตถุขึ้นได้",
+            opts, idx, img=D.pulley(nn, "plh0"), lvl=3,
+            why=f"เส้นเชือกรับทั้งวัตถุและชุดรอกล่าง F = ({W}+{Wp})/{nn} · ตอบ {trap} คือลืมน้ำหนักรอก")
+        nxt()
+
 
     for qi, k in enumerate([3, 2]):            # ★★★ รอกผสม แรงลดเป็นทวีคูณ
         r = pulley_stack_q(rng, want=want, k=k)
@@ -432,7 +539,7 @@ def build(add, P3, rng):
         if not r:
             continue
         nn, h, opts, idx = r
-        add(P3, "ระบบรอก",
+        add(P3, "ระบบรอก · ความยาวเชือก",
             "ระบบรอกดังรูปใช้ยกวัตถุขึ้นในแนวดิ่ง เชือกและรอกเบามาก ไม่มีความฝืด\n"
             f"ถ้าต้องการยกวัตถุขึ้นสูง {h} เมตร ต้องดึงปลายเชือกเป็นระยะกี่เมตร",
             opts, idx, img=D.pulley(nn, f"plr{qi}", mirror=qi % 2 == 0), lvl=3,
@@ -440,36 +547,50 @@ def build(add, P3, rng):
         nxt()
 
     # ---- ชุดเฟือง
-    for qi in range(2):
-        r = gear_dir_q(rng, want=want)
-        if not r:
-            continue
+    r = gear_dir_q(rng, want=want)             # สี่ตัวเรียงหักมุม
+    if r:
         teeth, drive, cwise, ask, angles, opts, idx = r
         nm = [CH[i] for i in range(len(teeth))]
         txt = ["  ".join(f"{nm[i]} {DIRW[c]}" for i, c in zip(ask, o)) for o in opts]
-        add(P3, "ชุดเฟือง",
-            f"เฟืองทั้งสี่ตัวขบกันดังรูป เฟือง {nm[drive]} หมุน{DIRW[cwise]}\n"
+        add(P3, "ชุดเฟือง · ทิศหมุน",
+            f"เฟืองทั้งสี่ตัวขบกันดังรูป เฟือง {nm[drive]} หมุน{DIRW[cwise]}" + NLC +
             "เฟืองที่เหลือหมุนในทิศใดบ้าง",
             txt, idx,
-            img=D.gears(teeth, f"gd{qi}", names=nm, spin=(drive, cwise), angles=angles),
+            img=D.gears(teeth, "gd0", names=nm, spin=(drive, cwise), angles=angles),
             lvl=2, why="เฟืองที่ขบกันหมุนสวนทางเสมอ ทิศจึงสลับทีละตัว")
+        nxt()
+
+    r = gear_tree_q(rng, want=want)            # สิบตัวแตกกิ่ง ถามตัวที่ไกลกันที่สุด
+    if r:
+        (teeth, parents, angles, drive, cwise, pick, dist), opts, idx = r
+        nm = [CH2[i] for i in range(len(teeth))]
+        txt = ["  ".join(f"{nm[p]} {DIRW[c]}" for p, c in zip(pick, o)) for o in opts]
+        add(P3, "ชุดเฟือง · แตกกิ่ง",
+            f"เฟือง {len(teeth)} ตัวขบกันแตกออกเป็นหลายทิศดังรูป" + NLC +
+            f"ถ้าเฟือง {nm[drive]} หมุน{DIRW[cwise]}" + NLC +
+            f"เฟือง {' '.join(nm[p] for p in pick)} หมุนในทิศใดบ้าง",
+            txt, idx,
+            img=D.gears(teeth, "gt0", names=nm, spin=(drive, cwise),
+                        parents=parents, angles=angles),
+            lvl=3,
+            why="นับจำนวนเฟืองที่คั่นจากตัวที่โจทย์บอก คู่หมุนทางเดียวกัน คี่หมุนสวน")
         nxt()
 
     r = gear_speed_q(rng, want=want)
     if r:
         teeth, rpm, opts, idx = r
         nm = [CH[i] for i in range(len(teeth))]
-        add(P3, "ชุดเฟือง",
-            f"เฟืองสามตัวขบกันดังรูป เฟือง {nm[0]} หมุนด้วยอัตรา {rpm} รอบต่อนาที\n"
-            f"เฟือง {nm[-1]} หมุนด้วยอัตรากี่รอบต่อนาที",
+        add(P3, "ชุดเฟือง · จำนวนรอบ",
+            f"เฟืองสามตัวขบกันดังรูป ถ้าหมุนเฟือง {nm[0]} ไปครบ {rpm} รอบ" + NLC +
+            f"เฟือง {nm[-1]} จะหมุนไปกี่รอบ",
             opts, idx, img=D.gears(teeth, "gs0", names=nm), lvl=2,
-            why=f"n1 t1 = n2 t2 · เฟืองกลางไม่มีผล · {rpm} x {teeth[0]}/{teeth[-1]}")
+            why=f"จำนวนฟันที่ขบกันเท่ากัน · เฟืองกลางไม่มีผล · {rpm} x {teeth[0]}/{teeth[-1]}")
         nxt()
 
     r = gear_rev_q(rng, want=want)
     if r:
         (ta, tb, N), opts, idx = r
-        add(P3, "ชุดเฟือง",
+        add(P3, "ชุดเฟือง · จำนวนรอบ",
             f"เฟืองสองตัวขบกันดังรูป เฟือง ก มี {ta} ฟัน เฟือง ข มี {tb} ฟัน\n"
             f"ถ้าเฟือง ก หมุนครบ {N} รอบ เฟือง ข จะหมุนกี่รอบ",
             opts, idx, img=D.gears([ta, tb], "gr0", names=["ก", "ข"]), lvl=2,
@@ -479,7 +600,7 @@ def build(add, P3, rng):
     r = gear_compound_q(rng, want=want)
     if r:
         (t0, t1a, t1b, t2, N), opts, idx, trap = r
-        add(P3, "ชุดเฟือง",
+        add(P3, "ชุดเฟือง · ซ้อนเพลา",
             f"เฟือง ข เป็นเฟืองสองวงยึดบนเพลาเดียวกัน จึงหมุนไปพร้อมกันเสมอ\n"
             f"วงนอก {t1a} ฟันขบกับเฟือง ก  วงใน {t1b} ฟันขบกับเฟือง ค\n"
             f"ถ้าเฟือง ก หมุนครบ {N} รอบ เฟือง ค จะหมุนกี่รอบ",
@@ -494,14 +615,18 @@ def build(add, P3, rng):
         if not r:
             continue
         (m1, d1, m2, d2, m3, x), opts, idx = r
-        marks = [(-d1, f"{m1} kg"), (-d2, f"{m2} kg"), (x, "?")]
-        head = ("คานเบาสม่ำเสมอวางบนจุดหมุนดังรูป ขีดบนคานห่างกันขีดละ 1 เมตร\n")
+        head = "คานเบาสม่ำเสมอวางบนจุดหมุนดังรูป ขีดบนคานห่างกันขีดละ 1 เมตร" + NLC
         if ask == "dist":
-            q = f"ต้องวางมวล {m3} กิโลกรัมไว้ที่ตำแหน่งใด (ห่างจากจุดหมุนกี่เมตร) คานจึงสมดุล"
+            # กล่องแสดงมวลตามปกติ ส่วนระยะที่ถามไปอยู่บนเส้นบอกระยะใต้คาน
+            # ถ้าใส่ ? ไว้ในกล่องทั้งที่โจทย์บอกมวลแล้ว คนอ่านจะนึกว่าตำแหน่งกล่องถูกตรึงไว้
+            marks = [(-d1, f"{m1} kg"), (-d2, f"{m2} kg"), (x, f"{m3} kg")]
+            img = D.beam(marks, f"bm{qi}", dimq=2)
+            q = "ระยะที่ทำเครื่องหมายคำถามไว้ ต้องเป็นกี่เมตรคานจึงสมดุล"
         else:
-            q = "มวลที่ต้องวางในช่องเครื่องหมายคำถาม มีค่ากี่กิโลกรัมคานจึงสมดุล"
-        add(P3, "คานสมดุล", head + q, opts, idx,
-            img=D.beam(marks, f"bm{qi}"), lvl=2,
+            marks = [(-d1, f"{m1} kg"), (-d2, f"{m2} kg"), (x, "?")]
+            img = D.beam(marks, f"bm{qi}")
+            q = "มวลในกล่องเครื่องหมายคำถาม ต้องเป็นกี่กิโลกรัมคานจึงสมดุล"
+        add(P3, "คานสมดุล", head + q, opts, idx, img=img, lvl=2,
             why="ผลรวมโมเมนต์สองฝั่งเท่ากัน · m x d ซ้าย = m x d ขวา")
         nxt()
 
@@ -523,7 +648,7 @@ def build(add, P3, rng):
     if r:
         (r1, r2, r3, r4), opts, idx, _k = r
         add(P3, "วงจรไฟฟ้า",
-            "วงจรบริดจ์ในรูป ตัวเลขมีหน่วยเป็นโอห์ม และ G คือแกลแวนอมิเตอร์\n"
+            "จากวงจรบริดจ์ในรูป G คือแกลแวนอมิเตอร์" + NLC +
             "ต้องปรับตัวต้านทานช่องเครื่องหมายคำถามเป็นกี่โอห์ม เข็มของ G จึงชี้ศูนย์",
             opts, idx, img=D.bridge((str(r1), str(r2), str(r3), "?", "G"), "br0", emf="E"),
             lvl=3, why=f"บริดจ์สมดุลเมื่อคูณไขว้เท่ากัน · {r1} x ? = {r2} x {r3}")
@@ -535,8 +660,7 @@ def build(add, P3, rng):
         opts = _opts(0, [r1, r2, r1 + r2, abs(r1 - r3) or r3], want)
         if opts:
             add(P3, "วงจรไฟฟ้า",
-                "วงจรบริดจ์ในรูป ตัวเลขมีหน่วยเป็นโอห์ม\n"
-                "กระแสที่ไหลผ่านแกลแวนอมิเตอร์ G มีค่ากี่แอมแปร์",
+                "จากวงจรบริดจ์ในรูป กระแสที่ไหลผ่านแกลแวนอมิเตอร์ G มีค่ากี่แอมแปร์",
                 [str(x) for x in opts], opts.index(0),
                 img=D.bridge((str(r1), str(r2), str(r3), str(r4), "G"), "br1", emf="E"),
                 lvl=3,
@@ -594,6 +718,15 @@ if __name__ == "__main__":
                 nn, h, o, i = r
                 ck(int(o[i]) == nn * h, f"รอกเชือก s={s}")
 
+            r = pulley_heavy_q(rng, want=w)
+            if r:
+                n += 1
+                nn, W, Wp, o, i2, trap = r
+                ck(int(o[i2]) * nn == W + Wp, f"รอกมีน้ำหนัก s={s}: เฉลยไม่ใช่ (W+Wp)/n")
+                ck(str(trap) in o, f"รอกมีน้ำหนัก s={s}: ตัวลวงลืมน้ำหนักรอกหายไป")
+                ck(len(set(o)) == 5, f"รอกมีน้ำหนัก s={s}: ตัวเลือกซ้ำ")
+
+
             r = pulley_stack_q(rng, want=w)
             if r:
                 n += 1
@@ -611,6 +744,21 @@ if __name__ == "__main__":
                 ck(len(set(o)) == 5, f"เฟืองทิศ s={s}: ตัวเลือกซ้ำ")
                 ck(o[i] == tuple(real[k] for k in ask), f"เฟืองทิศ s={s}: เฉลยผิดกฎสลับทิศ")
                 ck(len(angles) == len(teeth) - 1, f"เฟืองทิศ s={s}: มุมไม่ครบ")
+
+            r = gear_tree_q(rng, want=w)
+            if r:
+                n += 1
+                (teeth, parents, angles, drive, cwise, pick, dist), o, i2 = r
+                ck(len(set(o)) == 5, f"เฟืองแตกกิ่ง s={s}: ตัวเลือกซ้ำ")
+                cx, cy, rad, par = D.gear_positions(teeth, parents, angles)
+                for i3 in range(len(teeth)):
+                    for j3 in range(i3 + 1, len(teeth)):
+                        if par[j3] == i3:
+                            continue
+                        gap = ((cx[i3] - cx[j3]) ** 2 + (cy[i3] - cy[j3]) ** 2) ** .5
+                        ck(gap > rad[i3] + rad[j3], f"เฟืองแตกกิ่ง s={s}: เฟืองทับกัน")
+                ck(dist >= len(teeth) - 4, f"เฟืองแตกกิ่ง s={s}: เส้นทางสั้นเกินไป")
+
 
             r = gear_speed_q(rng, want=w)
             if r:

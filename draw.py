@@ -607,7 +607,28 @@ def _gear_teeth(node):
     return (node, node) if isinstance(node, int) else (node[0], node[1])
 
 
-def gears(nodes, name, names=None, spin=None, angles=None, unit=2.0, pad=18):
+def gear_positions(nodes, parents=None, angles=None, unit=2.0):
+    """คำนวณจุดศูนย์กลางและรัศมีของเฟืองทุกตัว ให้ผู้เรียกเอาไปตรวจการชนกันก่อนวาด
+
+    parents[i] = ดัชนีของเฟืองที่ตัว i ไปขบด้วย (ต้องน้อยกว่า i) ถ้าไม่ส่งมาถือว่าต่อเป็นแถว
+    โครงแบบต้นไม้ทำให้แตกกิ่งไปหลายทิศได้ ไม่ใช่เรียงเส้นเดียว
+    """
+    import math
+    T = [_gear_teeth(n) for n in nodes]
+    R = [(max(9.0, a * unit), max(9.0, b * unit)) for a, b in T]
+    par = list(parents or [i - 1 for i in range(len(nodes))])
+    ang = list(angles or [0] * (len(nodes) - 1))
+    cx, cy = [0.0], [0.0]
+    for i in range(1, len(nodes)):
+        pi = par[i]
+        dist = R[pi][1] + R[i][0]
+        a = math.radians(ang[i - 1])
+        cx.append(cx[pi] + dist * math.cos(a))
+        cy.append(cy[pi] + dist * math.sin(a))
+    return cx, cy, [max(r) for r in R], par
+
+
+def gears(nodes, name, names=None, spin=None, angles=None, parents=None, unit=2.0, pad=18):
     """ชุดเฟือง — วางเรียงเป็นเส้นตรงหรือหักมุมก็ได้ และรองรับเฟืองซ้อนเพลา
 
     nodes[i] = จำนวนฟัน                          เฟืองเดี่ยว
@@ -621,14 +642,7 @@ def gears(nodes, name, names=None, spin=None, angles=None, unit=2.0, pad=18):
     import math
     T = [_gear_teeth(n) for n in nodes]
     R = [(max(9.0, a * unit), max(9.0, b * unit)) for a, b in T]
-    ang = list(angles or [0] * (len(nodes) - 1))
-    cx, cy = [0.0], [0.0]
-    for i in range(1, len(nodes)):
-        dist = R[i - 1][1] + R[i][0]
-        a = math.radians(ang[i - 1])
-        cx.append(cx[-1] + dist * math.cos(a))
-        cy.append(cy[-1] + dist * math.sin(a))
-    rad = [max(r) for r in R]
+    cx, cy, rad, _par = gear_positions(nodes, parents, angles, unit)
     x0 = min(c - r for c, r in zip(cx, rad)) - pad
     y0 = min(c - r for c, r in zip(cy, rad)) - pad - (12 if spin is not None else 0)
     W = int(max(c + r for c, r in zip(cx, rad)) + pad - x0)
@@ -834,7 +848,7 @@ def pulleystack(k, name, load="W", pad=16, dx=44, dy=40):
     ต่างจาก pulley() ที่เป็นรอกพวงชุดเดียว แรงหารด้วยจำนวนเส้นเชือกตรง ๆ
     """
     RS, WRAP = 9, 13
-    W = int(pad * 2 + dx * (k - 1) + 96)
+    W = int(pad * 2 + dx * (k - 1) + 112)
     H = int(pad * 2 + dy * (k - 1) + 132)
     im = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(im)
@@ -859,12 +873,21 @@ def pulleystack(k, name, load="W", pad=16, dx=44, dy=40):
     d.rectangle([cx[0] - bw / 2, cy[0] + 26 * S, cx[0] + bw / 2, cy[0] + 50 * S],
                 fill=TOPF, outline=INK, width=lw)
     d.text((cx[0] - d.textlength(load, font=f) / 2, cy[0] + 30 * S), load, font=f, fill=INK)
-    fx = cx[-1] + (WRAP + 30) * S                        # ปลายเชือกชั้นบนสุด
-    d.line([cx[-1] + WRAP * S, cy[-1], fx, cy[-1]], fill=INK, width=lw)
-    d.line([fx, cy[-1], fx, cy[-1] + 34 * S], fill=INK, width=lw)
-    d.polygon([(fx, cy[-1] + 44 * S), (fx - 6 * S, cy[-1] + 31 * S),
-               (fx + 6 * S, cy[-1] + 31 * S)], fill=INK)
-    d.text((fx - d.textlength("F", font=f) / 2, cy[-1] + 48 * S), "F", font=f, fill=INK)
+    # ปลายเชือกชั้นบนสุดต้องพาดรอกคงที่ที่ติดเพดานก่อน ถึงจะดึงลงได้
+    # ถ้าลากเส้นหักลงกลางอากาศเฉย ๆ จะกลายเป็นรูปที่ดึงแล้วไม่เกิดอะไรขึ้น
+    fx = cx[-1] + (WRAP + 42) * S
+    yf = yc + (RS + 3) * S                               # รอกคงที่ ใต้เพดานพอดี
+    d.line([fx, yc, fx, yf - RS * S], fill=INK, width=lw)
+    d.line([cx[-1] + WRAP * S, cy[-1], fx - RS * S, yf], fill=INK, width=lw)
+    d.arc([fx - RS * S, yf - RS * S, fx + RS * S, yf + RS * S], 180, 360, fill=INK, width=lw)
+    d.ellipse([fx - RS * S, yf - RS * S, fx + RS * S, yf + RS * S],
+              fill=TOPF, outline=INK, width=lw)
+    d.ellipse([fx - 2 * S, yf - 2 * S, fx + 2 * S, yf + 2 * S], fill=INK)
+    ye = yf + 48 * S
+    d.line([fx + RS * S, yf, fx + RS * S, ye], fill=INK, width=lw)
+    d.polygon([(fx + RS * S, ye + 11 * S), (fx + RS * S - 6 * S, ye - 2 * S),
+               (fx + RS * S + 6 * S, ye - 2 * S)], fill=INK)
+    d.text((fx + RS * S - d.textlength("F", font=f) / 2, ye + 15 * S), "F", font=f, fill=INK)
     return _save(im, W, H, name)
 
 
