@@ -104,7 +104,7 @@ def inferop(rng, want=0):
         stem = ("จากตัวอย่างต่อไปนี้\n" + lines +
                 f"\nจงหาค่าของ  {qa} {sym} {qb}")
         ch, idx = _place([str(v) for v in opts] + [str(ans)], str(ans), want)
-        return stem, ch, idx
+        return stem, ch, idx, "กฎที่ซ่อนอยู่คือ a " + sym + " b = " + name
     raise RuntimeError("สร้างโจทย์อนุมานตัวดำเนินการไม่สำเร็จ")
 
 
@@ -262,8 +262,10 @@ def build(add, part, rng):
     n = 0
     for fn, arche, lvl, wants in plan:
         for w in wants:
-            stem, ch, idx = fn(rng, want=w)
-            add(part, arche, stem, ch, idx, lvl=lvl)
+            res = fn(rng, want=w)
+            stem, ch, idx = res[:3]
+            why = res[3] if len(res) > 3 else None   # บางตัวสร้างบอกกฎรายข้อได้
+            add(part, arche, stem, ch, idx, lvl=lvl, why=why)
             n += 1
     return n
 
@@ -281,7 +283,7 @@ if __name__ == "__main__":
         for want in range(5):
             for fn, nm in ((inferop, "inferop"), (pairsum, "pairsum"),
                            (codeword, "codeword"), (nested, "nested")):
-                stem, ch, idx = fn(rng, want=want)
+                stem, ch, idx = fn(rng, want=want)[:3]
                 if len(ch) != 5 or len(set(ch)) != 5:
                     bad.append(f"{nm} s={s} w={want}: ตัวเลือกซ้ำหรือไม่ครบ 5")
                 if idx != want:
@@ -290,7 +292,7 @@ if __name__ == "__main__":
     # อนุมานตัวดำเนินการ: ตัวอย่างต้องบีบให้เหลือกฎเดียวจริง
     for s in range(200):
         rng = random.Random(1000 + s)
-        stem, ch, idx = inferop(rng, want=s % 5)
+        stem, ch, idx = inferop(rng, want=s % 5)[:3]
         lines = [l.strip() for l in stem.split("\n") if "=" in l]
         ex = []
         for l in lines:
@@ -309,7 +311,7 @@ if __name__ == "__main__":
     r = random.Random(4)
     print("ตัวอย่างแนวใหม่\n" + "=" * 60)
     for fn in (inferop, pairsum, codeword, nested, tower):
-        stem, ch, idx = fn(r, want=2)
+        stem, ch, idx = fn(r, want=2)[:3]
         print(stem)
         print("   " + "   ".join(f"{'กขคงจ'[i]}{'*' if i==idx else ''}) {c}" for i, c in enumerate(ch)))
         print("-" * 60)

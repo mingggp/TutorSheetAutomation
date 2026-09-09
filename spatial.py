@@ -140,6 +140,11 @@ def overlay(rng, want=0, n=6):
 #  อนุกรมรูปภาพ — สร้างจากกฎจริง คำตอบถูกโดยการก่อสร้าง
 # ============================================================
 
+def _plain(rule):
+    """ตัดอักขระองศาออก เพราะยังไม่ได้ยืนยันว่าฟอนต์ Sarabun มีอักขระนี้"""
+    return rule.replace("\u00b0", " องศา").replace("  ", " ")
+
+
 RULES = {
     "หมุนตามเข็ม 90°": lambda g: rot90(g),
     "เลื่อนลง 1 แถว": lambda g: shift(g, 1, 0),
@@ -489,17 +494,17 @@ def build(add, P2, rng):
         want = (want + 2) % 5
 
     for qi in range(4):                       # ★★☆ อนุกรมรูปภาพ กฎชั้นเดียว
-        frames, opts, idx, _ = series(rng, want=want, hard=False)
+        frames, opts, idx, rule = series(rng, want=want, hard=False)
         img, optimg = render_series(frames, opts, f"sr{qi}")
         add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
-            img=img, optimg=optimg, lvl=2)
+            img=img, optimg=optimg, lvl=2, why="กฎของลำดับคือ " + _plain(rule))
         want = (want + 2) % 5
 
     for qi in range(4):                       # ★★★ อนุกรมรูปภาพ กฎซ้อนสองชั้น
-        frames, opts, idx, _ = series(rng, want=want, hard=True)
+        frames, opts, idx, rule = series(rng, want=want, hard=True)
         img, optimg = render_series(frames, opts, f"sh{qi}")
         add(P2, "อนุกรมรูปภาพ", SERIES_STEM, [""] * 5, idx,
-            img=img, optimg=optimg, lvl=3)
+            img=img, optimg=optimg, lvl=3, why="กฎของลำดับคือ " + _plain(rule))
         want = (want + 2) % 5
 
     A, B, opts, idx = overlay(rng, want=want, n=8)   # ★★★ ตารางใหญ่ ภาระสายตาสูง
