@@ -11,7 +11,9 @@ set SUBJ=%~5
 if "%MIX%"==""   set MIX=std
 if "%NUM%"==""   set NUM=50
 if "%SETNO%"=="" set SETNO=1
-if "%SD%"==""    set SD=0
+REM  ไม่ระบุ seed มา ให้ใช้หมายเลขชุดเป็น seed
+REM  คลังจึงถูกสุ่มใหม่ทั้งชุด ชีทคนละชุดได้ทั้งตัวเลขและรูปคนละชุดจริง
+if "%SD%"==""    set SD=%SETNO%
 if "%SUBJ%"==""  set SUBJ=tpat3
 set TPAT_SEED=%SD%
 
