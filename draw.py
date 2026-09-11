@@ -1253,3 +1253,188 @@ def symgrid(rows, sums, name, cell=34, pad=12):
         d.text(((pad + C * cell + 12) * S, (pad + r * cell + cell * .28) * S),
                lab, font=f, fill=INK)
     return _save(im, W, H, name)
+
+
+# ================================================================ ตัวดำเนินการสัญลักษณ์รูป
+# รูปทรงต้องไม่สมมาตร ไม่งั้นหมุนหรือกลับหัวแล้วดูไม่ออกว่าเปลี่ยน
+# ข้อสอบจริงใช้ชุดนี้ (ดู DIGEST-from-tutor) จึงคุมให้ทุกรูปบอกทิศได้ชัด
+SHAPE_KINDS = ["tri", "pent", "arrow", "flag", "chev"]
+
+
+def _poly(kind):
+    """คืนจุดยอดในกรอบ -1..1 · ทุกรูปต้องดูออกว่าหันทางไหน"""
+    if kind == "tri":
+        return [(0, -1), (.95, .8), (-.95, .8)]
+    if kind == "pent":
+        return [(0, -1), (.95, -.28), (.59, .9), (-.59, .9), (-.95, -.28)]
+    if kind == "arrow":
+        return [(0, -1), (.8, .1), (.32, .1), (.32, .95),
+                (-.32, .95), (-.32, .1), (-.8, .1)]
+    if kind == "flag":
+        return [(-.5, -1), (.8, -.55), (-.5, -.1), (-.5, 1), (-.8, 1), (-.8, -1)]
+    return [(0, -1), (.9, .05), (.9, .6), (0, -.45), (-.9, .6), (-.9, .05)]
+
+
+def _drawshape(d, sh, cx, cy, r, lw):
+    """sh = (ชนิด, มุมหมุนเป็นองศา, ระบายทึบไหม)"""
+    import math
+    kind, rot, fill = sh
+    a = math.radians(rot)
+    pts = []
+    for x, y in _poly(kind):
+        pts.append((cx + (x * math.cos(a) - y * math.sin(a)) * r,
+                    cy + (x * math.sin(a) + y * math.cos(a)) * r))
+    d.polygon(pts, fill=INK if fill else "white", outline=INK, width=max(1, lw))
+
+
+def shaperow(shapes, name, cell=40, pad=8, box=True):
+    """แถวของรูปสัญลักษณ์ ใช้ทั้งเป็นโจทย์และเป็นตัวเลือก"""
+    W = pad * 2 + cell * len(shapes)
+    H = pad * 2 + cell
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    if box:
+        d.rectangle([pad * S // 2, pad * S // 2, (W - pad // 2) * S, (H - pad // 2) * S],
+                    outline=LINEG, width=lw)
+    for i, sh in enumerate(shapes):
+        _drawshape(d, sh, (pad + cell * i + cell / 2) * S, H / 2 * S,
+                   cell * S * .33, lw)
+    return _save(im, W, H, name)
+
+
+OP_TEXT = {
+    "flip":  "กลับหัวทุกรูป",
+    "rotcw": "หมุนทุกรูปตามเข็มนาฬิกา 90 องศา",
+    "left":  "เลื่อนทุกรูปไปทางซ้าย 1 ตำแหน่ง",
+    "right": "เลื่อนทุกรูปไปทางขวา 1 ตำแหน่ง",
+    "swap":  "สลับรูปซ้ายสุดกับรูปขวาสุด",
+    "fill":  "สลับการระบายของทุกรูป ทึบเป็นโปร่ง โปร่งเป็นทึบ",
+}
+OP_MARK = ["A", "B", "C", "D", "E"]
+
+
+def oplegend(pairs, name, w=340, rowh=30, pad=10):
+    """ตารางบอกความหมายของตัวดำเนินการ — pairs = [(ป้าย, ข้อความ)]
+
+    ข้อสอบจริงพิมพ์ตารางแบบนี้กำกับไว้ เราจึงต้องมีด้วย ไม่งั้นเดาไม่ได้
+    """
+    H = pad * 2 + rowh * len(pairs)
+    im = Image.new("RGB", (w * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    fb, fr = font(15, True), font(14, False)
+    for i, (mark, txt) in enumerate(pairs):
+        y = (pad + i * rowh) * S
+        d.rectangle([pad * S, y, (pad + 34) * S, y + rowh * S],
+                    fill=TOPF, outline=INK, width=lw)
+        d.text(((pad + 17) * S - d.textlength(mark, font=fb) / 2, y + 6 * S),
+               mark, font=fb, fill=INK)
+        d.rectangle([(pad + 34) * S, y, (w - pad) * S, y + rowh * S],
+                    outline=LINEG, width=lw)
+        d.text(((pad + 44) * S, y + 7 * S), txt, font=fr, fill=INK)
+    return _save(im, w, H, name)
+
+
+# ---------------------------------------------------------------- วงกลมแบ่งส่วน
+def pie(sectors, name, r=34, pad=7, start=-90.0, q=False):
+    """วงกลมแบ่งเป็นส่วนเท่า ๆ กัน — sectors = ลิสต์ของ 0/1 (1 = ระบายทึบ)
+
+    ของจริงใช้ดำล้วนบนขาว ไม่ใช่สีติวเตอร์ เพราะโจทย์ตัดสินด้วยทึบ/โปร่งล้วน ๆ
+    """
+    n = len(sectors)
+    W = H = r * 2 + pad * 2
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    box = [pad * S, pad * S, (pad + r * 2) * S, (pad + r * 2) * S]
+    step = 360.0 / n
+    for i, v in enumerate(sectors):
+        if v:
+            d.pieslice(box, start + i * step, start + (i + 1) * step, fill=INK)
+    for i in range(n):                      # เส้นแบ่งทุกเส้น วาดทับให้เห็นแม้ช่องข้างกันทึบทั้งคู่
+        a = math.radians(start + i * step)
+        cx = cy = (pad + r) * S
+        d.line([cx, cy, cx + math.cos(a) * r * S, cy + math.sin(a) * r * S],
+               fill=INK, width=_HW)
+    d.ellipse(box, outline=INK, width=_LW)
+    if q:                                   # วงกลมว่างที่มีเครื่องหมายคำถาม ใช้เป็นช่องที่ต้องตอบ
+        im = Image.new("RGB", (W * S, H * S), "white")
+        d = ImageDraw.Draw(im)
+        d.ellipse(box, outline=INK, width=_LW)
+        f = font(int(r * .9), True)
+        d.text(((W * S - d.textlength("?", font=f)) / 2, (pad + r * .35) * S),
+               "?", font=f, fill=INK)
+    return _save(im, W, H, name)
+
+
+# ---------------------------------------------------------------- ตารางจุด / กระดาษเจาะรู
+def dotgrid(rows, name, cell=24, pad=9, lines=True, frame=True, fold=(), rad=.24):
+    """0 = ว่าง · 1 = จุดทึบ · 2 = จุดโปร่ง (วงแหวน)
+
+    fold = เส้นพับ [("v", i), ("h", j)] วาดเป็นเส้นประที่ขอบช่องที่ i — ใช้กับโจทย์พับกระดาษ
+    lines = False ได้กระดาษเปล่าที่มีแต่จุด ซึ่งเป็นหน้าตาของโจทย์เจาะรูจริง
+    """
+    R = len(rows)
+    C = max((len(q) for q in rows), default=0)
+    W, H = C * cell + pad * 2, R * cell + pad * 2
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    ax, ay = pad * S, pad * S
+    bx, by = (pad + C * cell) * S, (pad + R * cell) * S
+    if lines:
+        for i in range(R + 1):
+            y = (pad + i * cell) * S
+            d.line([ax, y, bx, y], fill=_HAIR, width=_HW)
+        for j in range(C + 1):
+            x = (pad + j * cell) * S
+            d.line([x, ay, x, by], fill=_HAIR, width=_HW)
+    for kind, i in fold:                    # เส้นพับเป็นเส้นประ ไม่ใช่เส้นทึบ จะได้ไม่สับสนกับขอบกระดาษ
+        if kind == "v":
+            x = (pad + i * cell) * S
+            for t in range(0, int(by - ay), int(9 * S)):
+                d.line([x, ay + t, x, min(ay + t + 5 * S, by)], fill=_GREY, width=_HW)
+        else:
+            y = (pad + i * cell) * S
+            for t in range(0, int(bx - ax), int(9 * S)):
+                d.line([ax + t, y, min(ax + t + 5 * S, bx), y], fill=_GREY, width=_HW)
+    for i in range(R):
+        for j in range(len(rows[i])):
+            v = rows[i][j]
+            if not v:
+                continue
+            cx = (pad + j * cell + cell / 2) * S
+            cy = (pad + i * cell + cell / 2) * S
+            rr = cell * S * rad
+            bb = [cx - rr, cy - rr, cx + rr, cy + rr]
+            if v == 1:
+                d.ellipse(bb, fill=INK)
+            else:
+                d.ellipse(bb, outline=INK, width=_LW)
+    if frame:
+        d.rectangle([ax, ay, bx, by], outline=INK, width=_LW)
+    return _save(im, W, H, name)
+
+
+# ---------------------------------------------------------------- ภาพฉายสามด้าน
+def views(plates, name, labels=("ด้านหน้า", "ด้านข้าง", "ด้านบน"), gap=30, labh=26):
+    """วางภาพฉายเรียงกันพร้อมป้ายชื่อใต้ภาพ — plates = ไฟล์ที่ได้จาก plate()"""
+    ims = [Image.open(os.path.join(IMG, p)) for p in plates]
+    hi = [HIRES.get(p, 1) for p in plates]
+    ims = [im if h == 1 else im.resize((im.width // h, im.height // h), Image.LANCZOS)
+           for im, h in zip(ims, hi)]
+    f = font(15, False)
+    wid = [max(im.width, int(_tl(f, t)) + 10 * S) for im, t in zip(ims, labels)]
+    W = (sum(wid) + gap * S * (len(ims) - 1)) // S
+    H = (max(im.height for im in ims)) // S + labh
+    out = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(out)
+    x = 0
+    for im, t, w in zip(ims, labels, wid):
+        out.paste(im, (x + (w - im.width) // 2, 0))
+        d.text((x + (w - _tl(f, t)) / 2, (H - labh + 5) * S), t, font=f, fill=INK)
+        x += w + gap * S
+    return _save(out, W, H, name)
+
+
+def _tl(f, t):
+    return ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(t, font=f)

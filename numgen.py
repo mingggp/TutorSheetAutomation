@@ -28,6 +28,9 @@ TH_MONTH = ["", "มกราคม", "กุมภาพันธ์", "มี�
             "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
 
 
+NL = chr(10)      # เขียนเป็น chr เพราะสคริปต์แพตช์ที่ผ่าน heredoc กิน backslash
+
+
 def _place(opts, truth, want):
     rest = [o for o in opts if o != truth]
     out = rest[:want] + [truth] + rest[want:]
@@ -66,7 +69,7 @@ def q_seq(rng, want):
     kind = rng.choice(["arith", "geom", "diff2", "inter", "mul_add"])
     for _ in range(200):
         if kind == "arith":
-            a0, d = rng.randint(3, 19), rng.randint(3, 12)
+            a0, d = rng.randint(5, 40), rng.randint(4, 19)
             xs = [a0 + d * i for i in range(5)]
             why = f"บวก {d} ทุกขั้น"
         elif kind == "geom":
@@ -77,7 +80,8 @@ def q_seq(rng, want):
                 continue
             why = f"หารด้วย {r} ทุกขั้น"
         elif kind == "diff2":
-            a0, d0, dd = rng.randint(2, 9), rng.randint(1, 4), rng.randint(1, 4)
+            # ช่วงเดิมแคบเกิน (128 แบบ) ชุดต่างกันจึงชนกันได้ง่าย และได้อนุกรมง่ายอย่าง 3 4 6 9
+            a0, d0, dd = rng.randint(2, 24), rng.randint(2, 9), rng.randint(2, 7)
             xs, cur, step = [a0], a0, d0
             last = d0
             for _ in range(4):
@@ -612,11 +616,352 @@ def q_liarcount(rng, want, n=5):
     return None
 
 
+# ================================================================ ปริศนาสามเหลี่ยม
+def q_tripuz(rng, want, tag=0):
+    """สามเหลี่ยมสามรูป มุมสามค่ากับค่ากลาง ใช้กฎเดียวกันทุกรูป"""
+    rules = [("ผลบวกมุมสามข้างคูณ {k}", lambda a, b, c, k: (a + b + c) * k),
+             ("ผลคูณสองค่าแรกลบค่าที่สาม แล้วคูณ {k}", lambda a, b, c, k: (a * b - c) * k),
+             ("ผลบวกสองค่าแรกคูณค่าที่สาม หารด้วย {k}",
+              lambda a, b, c, k: (a + b) * c // k)]
+    for _ in range(400):
+        name, f = rng.choice(rules)
+        k = rng.randint(1, 4)
+        tris = []
+        for _ in range(3):
+            a, b, c = (rng.randint(2, 9) for _ in range(3))
+            if "หารด้วย" in name and ((a + b) * c) % k:
+                tris = []
+                break
+            v = f(a, b, c, k)
+            if not (3 <= v <= 200):
+                tris = []
+                break
+            tris.append((a, b, c, v))
+        if len(tris) < 3:
+            continue
+        ans = tris[2][3]
+        step = max(1, ans // 8)
+        wrong = [ans + step, ans - step, ans + 2 * step,
+                 tris[2][0] + tris[2][1] + tris[2][2], tris[0][3]]
+        cells = [list(t) for t in tris]
+        cells[2][3] = "?"
+        return _pack("ปริศนาเรขาคณิต", 2,
+                     "สามเหลี่ยมทั้งสามรูปใช้กฎเดียวกัน ตัวเลขในช่อง ? คือข้อใด",
+                     ans, wrong, want, "กฎคือ " + name.format(k=k),
+                     {"tris": tris, "k": k},
+                     draw=lambda t: D.compose(
+                         [D.tri(tuple(c), f"trx{t}_{i}") for i, c in enumerate(cells)],
+                         f"trq{t}", seps=["", ""], gap=20))
+    return None
+
+
+# ================================================================ โจทย์ปัญหา
+def q_work(rng, want):
+    """งานร่วมกัน — อัตราทำงานบวกกันได้ เลือกเลขที่ผลลัพธ์ลงตัว"""
+    for _ in range(300):
+        a, b = rng.sample([3, 4, 6, 8, 12, 15, 20, 24], 2)
+        num, den = a * b, a + b
+        if num % den:
+            continue
+        ans = num // den
+        wrong = [a + b, (a + b) // 2, abs(a - b), ans + 1, ans * 2]
+        return _pack("โจทย์ปัญหาคณิต", 2,
+                     f"คนแรกทำงานชิ้นหนึ่งเสร็จใน {a} วัน คนที่สองทำงานชิ้นเดียวกันเสร็จใน {b} วัน\n"
+                     "ถ้าช่วยกันทำตั้งแต่ต้น จะเสร็จในกี่วัน",
+                     ans, wrong, want,
+                     f"อัตราบวกกัน 1/{a} + 1/{b} แล้วกลับเศษเป็นส่วน",
+                     {"a": a, "b": b})
+    return None
+
+
+def q_avgspeed(rng, want):
+    """อัตราเร็วเฉลี่ยไป-กลับ คือค่าเฉลี่ยฮาร์มอนิก ไม่ใช่ค่าเฉลี่ยเลขคณิต"""
+    for _ in range(300):
+        u, v = rng.sample([20, 30, 40, 50, 60, 80, 100, 120], 2)
+        num, den = 2 * u * v, u + v
+        if num % den:
+            continue
+        ans = num // den
+        trap = (u + v) // 2
+        if ans == trap:
+            continue
+        wrong = [trap, ans + 2, ans - 2, u, v]
+        return _pack("โจทย์ปัญหาคณิต", 2,
+                     f"รถวิ่งจากเมือง A ไปเมือง B ด้วยอัตราเร็ว {u} กิโลเมตรต่อชั่วโมง\n"
+                     f"แล้ววิ่งกลับเส้นทางเดิมด้วยอัตราเร็ว {v} กิโลเมตรต่อชั่วโมง\n"
+                     "อัตราเร็วเฉลี่ยตลอดการเดินทางไป-กลับเป็นกี่กิโลเมตรต่อชั่วโมง",
+                     ans, wrong, want,
+                     f"ระยะเท่ากันให้ใช้ 2uv/(u+v) · ตอบ {trap} คือเฉลี่ยแบบผิด",
+                     {"u": u, "v": v})
+    return None
+
+
+# ================================================================ เชาวน์ปัญญา
+def q_cutlog(rng, want):
+    """จำนวนรอยตัดน้อยกว่าจำนวนท่อนหนึ่งเสมอ และช่วงพักน้อยกว่าจำนวนรอยตัดอีกหนึ่ง"""
+    for _ in range(200):
+        piece = rng.choice([2, 3, 4])
+        parts = rng.randint(4, 8)
+        L = piece * parts
+        cut, rest = rng.choice([3, 4, 5, 6]), rng.choice([1, 2, 3])
+        cuts = parts - 1
+        ans = cuts * cut + (cuts - 1) * rest
+        wrong = [parts * cut + parts * rest, cuts * cut, parts * cut,
+                 ans + cut, ans - rest]
+        return _pack("เชาวน์ปัญญา", 2,
+                     f"ท่อนไม้ยาว {L} เมตร ตัดออกเป็นท่อนย่อยยาวท่อนละ {piece} เมตร\n"
+                     f"การตัดหนึ่งครั้งใช้เวลา {cut} นาที และต้องพัก {rest} นาทีระหว่างการตัดแต่ละครั้ง\n"
+                     "ตั้งแต่เริ่มตัดครั้งแรกจนตัดครั้งสุดท้ายเสร็จ ใช้เวลาทั้งหมดกี่นาที",
+                     ans, wrong, want,
+                     f"ได้ {parts} ท่อนใช้การตัดแค่ {cuts} ครั้ง และพักแค่ {cuts - 1} ช่วง",
+                     {"L": L, "piece": piece, "cut": cut, "rest": rest, "parts": parts})
+    return None
+
+
+# ================================================================ หน่วยและการประมาณค่า
+def q_unit(rng, want):
+    """ปริมาตรทรงกระบอกแล้วเปลี่ยนหน่วยเป็นลิตร จุดพลาดอยู่ที่การเปลี่ยนหน่วย"""
+    for _ in range(200):
+        r_cm = rng.choice([10, 20, 25, 30, 40, 50])
+        h_cm = rng.choice([50, 60, 80, 100, 120])
+        vol = 314 * r_cm * r_cm * h_cm // 100          # ใช้ pi = 3.14
+        if vol % 1000:
+            continue
+        ans = vol // 1000
+        wrong = [ans * 10, ans // 10 if ans >= 10 else None, ans * 2,
+                 ans + 20, vol // 100]
+        return _pack("หน่วยและการประมาณค่า", 2,
+                     f"ถังทรงกระบอกรัศมี {r_cm} เซนติเมตร สูง {h_cm} เซนติเมตร\n"
+                     "บรรจุน้ำได้เต็มถังพอดี จะบรรจุน้ำได้ประมาณกี่ลิตร (ใช้ pi ประมาณ 3.14)",
+                     ans, wrong, want,
+                     "หาปริมาตรเป็นลูกบาศก์เซนติเมตรก่อน แล้วหารพัน เพราะพันลูกบาศก์เซนติเมตรเท่ากับหนึ่งลิตร",
+                     {"r": r_cm, "h": h_cm, "vol": vol})
+    return None
+
+
+# ================================================================ เติบโตแบบทวีคูณ
+def q_double(rng, want):
+    """แบ่งตัวเป็นสองเท่าทุกช่วงเวลา ถามเวลาที่ต้องใช้ ไม่ใช่ถามจำนวน
+
+    ถามเวลาทำให้ยากกว่าถามจำนวน เพราะต้องถอยกลับจากกำลังสอง
+    """
+    for _ in range(200):
+        per = rng.choice([2, 3, 4, 5])
+        k = rng.randint(3, 6)
+        mult = 2 ** k
+        t0 = per * rng.randint(2, 5)
+        ans = t0 + per * k
+        wrong = [t0 * mult, t0 + k, t0 * k, ans + per, ans - per]
+        return _pack("เติบโตแบบทวีคูณ", 3,
+                     f"แบคทีเรียชนิดหนึ่งแบ่งตัวจาก 1 ตัวเป็น 2 ตัวทุก ๆ {per} วินาที\n"
+                     f"เริ่มจากแบคทีเรีย 1 ตัว ใช้เวลา {t0} วินาทีจึงเต็มขวดโหลใบหนึ่งพอดี\n"
+                     f"ถ้าต้องการให้ได้จำนวนเท่ากับ {mult} ขวดโหล ต้องใช้เวลาทั้งหมดกี่วินาที",
+                     ans, wrong, want,
+                     f"เพิ่ม {mult} เท่าคือแบ่งตัวอีก {k} รอบ ใช้เวลาเพิ่ม {per} x {k} วินาที",
+                     {"per": per, "k": k, "t0": t0, "mult": mult})
+    return None
+
+
+# ================================================================ รหัสเลื่อนอักษร
+def q_caesar(rng, want):
+    """เลื่อนอักษรทีละตำแหน่งไม่เท่ากัน ยากกว่าการเลื่อนคงที่"""
+    for _ in range(200):
+        words = ["MOUSE", "PLANT", "CHAIR", "BRICK", "STONE", "CLOUD", "GRAPE"]
+        w = rng.choice(words)
+        mode = rng.choice(["fix", "ramp"])
+        d0 = rng.randint(1, 4)
+        if mode == "fix":
+            enc = "".join(AZ[(AZ.index(c) + d0) % 26] for c in w)
+            why = f"เลื่อนไปข้างหน้าทีละ {d0} ตำแหน่งเท่ากันทุกตัว"
+        else:
+            enc = "".join(AZ[(AZ.index(c) + d0 + i) % 26] for i, c in enumerate(w))
+            why = f"ตัวแรกเลื่อน {d0} แล้วเพิ่มทีละ 1 ในตัวถัดไป"
+        w2 = rng.choice([x for x in words if x != w])
+        if mode == "fix":
+            ans = "".join(AZ[(AZ.index(c) + d0) % 26] for c in w2)
+        else:
+            ans = "".join(AZ[(AZ.index(c) + d0 + i) % 26] for i, c in enumerate(w2))
+        wrong, seen = [], {ans}
+        for off in (1, -1, 2, -2, 3):
+            cand = "".join(AZ[(AZ.index(c) + off) % 26] for c in w2)
+            if cand not in seen:
+                seen.add(cand)
+                wrong.append(cand)
+        return _pack("ปริศนาตัวอักษร", 2,
+                     f"ถ้า {w} เขียนเป็นรหัสว่า {enc}\nแล้ว {w2} จะเขียนเป็นรหัสว่าอย่างไร",
+                     ans, wrong, want, why, {"w": w, "enc": enc, "w2": w2,
+                                             "mode": mode, "d0": d0})
+    return None
+
+
+
+# ================================================================ อุปมาอุปไมยตัวเลข
+# ที่มา: ชุดที่ 8 ข้อ 5 — กฎไม่ได้อยู่ที่ตัวเลขทั้งจำนวน แต่อยู่ที่หลักแต่ละหลัก
+ANA = {
+    "mulsum":  (lambda a, b: f"{a*b}{a+b}",      "คูณสองหลักได้เลขตัวหน้า บวกสองหลักได้เลขตัวหลัง"),
+    "summul":  (lambda a, b: f"{a+b}{a*b}",      "บวกสองหลักได้เลขตัวหน้า คูณสองหลักได้เลขตัวหลัง"),
+    "sqsq":    (lambda a, b: f"{a*a}{b*b}",      "ยกกำลังสองทีละหลักแล้วเขียนต่อกัน"),
+    "diffsum": (lambda a, b: f"{abs(a-b)}{a+b}", "ลบสองหลักได้เลขตัวหน้า บวกสองหลักได้เลขตัวหลัง"),
+    "sumdiff": (lambda a, b: f"{a+b}{abs(a-b)}", "บวกสองหลักได้เลขตัวหน้า ลบสองหลักได้เลขตัวหลัง"),
+}
+
+
+def _ana(key, x):
+    return ANA[key][0](x // 10, x % 10)
+
+
+def q_analogy(rng, want):
+    """สามคู่ตัวอย่างสอนกฎ คู่ที่สี่ถาม — ถามตัวตั้งหรือถามผลลัพธ์ก็ได้
+
+    ต้องยืนยันสองชั้น
+      1. มีกฎเดียวในคลังที่เข้ากับตัวอย่างทั้งสามคู่ ไม่งั้นถอดกฎได้หลายทาง
+      2. ถ้าถามตัวตั้ง ต้องมีเลขสองหลักเดียวที่ให้ผลลัพธ์นั้น ไม่งั้นมีคำตอบถูกหลายข้อ
+    """
+    for _ in range(300):
+        key = rng.choice(list(ANA))
+        pool = [v for v in range(11, 99) if v % 10]
+        rng.shuffle(pool)
+        picks = pool[:4]
+        outs = [_ana(key, v) for v in picks]
+        if len(set(outs)) < 4:
+            continue
+        fits = [k for k in ANA
+                if all(_ana(k, v) == o for v, o in zip(picks[:3], outs[:3]))]
+        if fits != [key]:
+            continue
+        back = rng.random() < .5
+        tgt, ans_in = picks[3], outs[3]
+        pairs = [f"{v}  :  {o}" for v, o in zip(picks[:3], outs[:3])]
+        if back:
+            if [v for v in range(10, 100) if _ana(key, v) == ans_in] != [tgt]:
+                continue
+            truth = tgt
+            wrong = []
+            for k2 in ANA:
+                if k2 == key:
+                    continue
+                hit = [v for v in range(10, 100) if _ana(k2, v) == ans_in]
+                if hit:
+                    wrong.append(hit[0])
+            wrong += [tgt % 10 * 10 + tgt // 10, tgt + 9, tgt - 9, tgt + 11]
+            tail = f"    ?  :  {ans_in}"
+        else:
+            truth = int(ans_in)
+            wrong = [int(_ana(k2, tgt)) for k2 in ANA if k2 != key]
+            wrong += [truth + 10, truth - 10]
+            tail = f"    {tgt}  :  ?"
+        stem = ("จากความสัมพันธ์ต่อไปนี้" + NL + "    " +
+                (NL + "    ").join(pairs) + NL + tail + NL +
+                "เครื่องหมาย ? แทนจำนวนใด")
+        return _pack("อุปมาอุปไมยตัวเลข", 3, stem, truth, wrong, want,
+                     "กฎอยู่ที่หลักแต่ละหลัก · " + ANA[key][1],
+                     params={"key": key, "picks": picks, "back": back})
+    return None
+
+
+# ================================================================ อนุกรมสลับสองชุด
+def q_interleave(rng, want):
+    """ตำแหน่งคี่กับตำแหน่งคู่เป็นคนละอนุกรม (ชุดที่ 8 ข้อ 3)
+
+    ตัวลวงหลักคือเอากฎของอีกชุดมาต่อ ซึ่งเป็นความผิดพลาดที่เกิดขึ้นจริงตอนทำ
+    """
+    for _ in range(300):
+        ka = rng.choice(["dbl", "dbp", "trm"])
+        a0 = rng.randint(2, 9)
+        A = [a0]
+        for _ in range(4):
+            if ka == "dbl":
+                A.append(A[-1] * 2 - 1)
+            elif ka == "dbp":
+                A.append(A[-1] * 2 + 1)
+            else:
+                A.append(A[-1] * 3 - 2)
+        wa = {"dbl": "คูณสองแล้วลบหนึ่ง", "dbp": "คูณสองแล้วบวกหนึ่ง",
+              "trm": "คูณสามแล้วลบสอง"}[ka]
+        b0, db = rng.randint(3, 15), rng.randint(2, 9)
+        B = [b0 + db * i for i in range(4)]
+        if A[-1] > 4000 or len(set(A) & set(B)) > 1:
+            continue
+        shown = [A[0], B[0], A[1], B[1], A[2], B[2], A[3], B[3]]
+        if len(set(shown)) < 8:
+            continue
+        truth = A[4]
+        wrong = [B[3] + db, shown[-1] + db, A[3] * 2, A[3] + A[2],
+                 truth + db, truth - 1, A[3] * 2 + 1]
+        stem = ("จงหาพจน์ถัดไปของลำดับต่อไปนี้" + NL + "    " +
+                ", ".join(str(v) for v in shown) + ", ...")
+        return _pack("อนุกรมสลับสองชุด", 3, stem, truth, wrong, want,
+                     f"แยกเป็นสองชุด ชุดตำแหน่งคี่{wa} ชุดตำแหน่งคู่บวก {db}",
+                     params={"ka": ka, "db": db})
+    return None
+
+
+# ================================================================ พีชคณิตแปลก
+def q_funceq(rng, want):
+    """สมการฟังก์ชัน — แทน x ด้วย k ลบ x อีกรอบ จะได้สมการสองตัวแปรแล้วแก้ได้
+
+    a*f(x) + b*f(k-x) = p*x + q
+    แทน x ด้วย k-x:  a*f(k-x) + b*f(x) = p*(k-x) + q
+    คูณไขว้แล้วลบกัน จะได้ (a*a - b*b) * f(x) = a*(p*x+q) - b*(p*(k-x)+q)
+    เรารับเฉพาะชุดที่ f ที่จุดที่ถามออกมาเป็นจำนวนเต็ม จึงตอบเป็นเลขสวยเสมอ
+    """
+    from fractions import Fraction
+    for _ in range(400):
+        a = rng.randint(1, 4)
+        b = rng.randint(1, 4)
+        if a == b or a * a == b * b:
+            continue
+        k = rng.randint(3, 12)
+        p = rng.randint(1, 6)
+        q = rng.randint(-8, 8)
+        t = rng.randint(1, k - 1)
+        num = Fraction(a * (p * t + q) - b * (p * (k - t) + q), a * a - b * b)
+        if num.denominator != 1:
+            continue
+        truth = int(num)
+        other = Fraction(a * (p * (k - t) + q) - b * (p * t + q), a * a - b * b)
+        wrong = [truth + 1, truth - 1, p * t + q, int(other) if other.denominator == 1 else None,
+                 truth * 2, truth + k, p * t]
+        lhs = (f"{a} f(x)" if a != 1 else "f(x)")
+        rhs = (f"{b} f({k} - x)" if b != 1 else f"f({k} - x)")
+        sign = "+" if q >= 0 else "-"
+        stem = (f"กำหนดให้ {lhs} + {rhs} = {p}x {sign} {abs(q)} สำหรับทุกจำนวนจริง x" + NL +
+                f"จงหาค่าของ f({t})")
+        return _pack("สมการฟังก์ชัน", 3, stem, truth, wrong, want,
+                     f"แทน x ด้วย {k} - x อีกครั้ง จะได้สองสมการแล้วกำจัด f({k} - x) ทิ้ง",
+                     params={"a": a, "b": b, "k": k, "p": p, "q": q, "t": t})
+    return None
+
+
+def q_nestrad(rng, want):
+    """รากซ้อนไม่รู้จบ — ตั้ง y แทนค่าทั้งก้อนแล้วยกกำลังสอง จะได้สมการกำลังสอง
+
+    เครื่องหมายบวก  y กำลังสอง = k + y  จึงเลือก k = y*y - y
+    เครื่องหมายลบ   y กำลังสอง = k - y  จึงเลือก k = y*y + y
+    คำตอบเป็นจำนวนเต็มพอดีทั้งสองแบบ จึงพิสูจน์ได้เป๊ะ
+    เขียนคำว่า "รากที่สองของ" เป็นตัวอักษร เพราะฟอนต์ชีทไม่มีเครื่องหมายกรณฑ์
+    """
+    y = rng.randint(3, 9)
+    plus = rng.random() < .5
+    k = y * y - y if plus else y * y + y
+    sign = "บวก" if plus else "ลบ"
+    truth = y
+    wrong = [y + 1, y - 1, k, k // 2, y * y, y + 2, k - y]
+    stem = ("จงหาค่าของจำนวนจริงบวกที่เขียนเป็นรากซ้อนกันไปไม่รู้จบดังนี้" + NL +
+            f"    รากที่สองของ ( {k} {sign} รากที่สองของ ( {k} {sign} "
+            f"รากที่สองของ ( {k} {sign} ... ) ) )")
+    return _pack("รากซ้อนไม่รู้จบ", 3, stem, truth, wrong, want,
+                 f"ตั้ง y แทนทั้งก้อน จะได้ y ยกกำลังสอง = {k} {sign} y",
+                 params={"y": y, "k": k, "plus": plus})
+
+
 GENS = [q_seq, q_numgrid, q_customop, q_clock, q_prob,
         q_mastermind, q_dateseq, q_paths,
         q_alnum, q_fillop, q_letterseq,
-        q_revseq, q_symsum, q_thaieng, q_liarcount]
-NEEDS_TAG = {"q_numgrid", "q_mastermind", "q_paths", "q_symsum"}
+        q_revseq, q_symsum, q_thaieng, q_liarcount,
+        q_tripuz, q_work, q_avgspeed, q_cutlog, q_unit, q_double, q_caesar,
+        q_analogy, q_interleave, q_funceq, q_nestrad]
+NEEDS_TAG = {"q_numgrid", "q_mastermind", "q_paths", "q_symsum", "q_tripuz"}
 
 
 def build(add, part, rng, per=6):
@@ -714,6 +1059,21 @@ if __name__ == "__main__":
                        f"สัญลักษณ์ s={s}: ผลรวมแถวไม่ตรงกับค่าที่ตั้ง")
                 elif g.__name__ == "q_thaieng":
                     ck(p["pairs"][5] == got, f"ไทยผสมอังกฤษ s={s}: เฉลยไม่ตรง")
+                elif g.__name__ == "q_work":
+                    ck(int(got) * (p["a"] + p["b"]) == p["a"] * p["b"],
+                       f"งานร่วม s={s}: เฉลยไม่ตรงกับอัตรารวม")
+                elif g.__name__ == "q_avgspeed":
+                    ck(int(got) * (p["u"] + p["v"]) == 2 * p["u"] * p["v"],
+                       f"อัตราเร็วเฉลี่ย s={s}: ไม่ใช่ค่าเฉลี่ยฮาร์มอนิก")
+                elif g.__name__ == "q_cutlog":
+                    cuts = p["parts"] - 1
+                    ck(int(got) == cuts * p["cut"] + (cuts - 1) * p["rest"],
+                       f"ตัดไม้ s={s}: นับรอยตัดหรือช่วงพักผิด")
+                elif g.__name__ == "q_unit":
+                    ck(int(got) * 1000 == p["vol"], f"หน่วย s={s}: เปลี่ยนหน่วยผิด")
+                elif g.__name__ == "q_double":
+                    ck(int(got) == p["t0"] + p["per"] * p["k"],
+                       f"ทวีคูณ s={s}: เวลาไม่ตรง")
                 elif g.__name__ == "q_liarcount":
                     ok, who, claims = p["ok"], p["who"], p["claims"]
                     ck(", ".join(who[i] for i in range(p["n"]) if ok[i]) == got,

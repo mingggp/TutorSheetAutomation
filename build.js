@@ -15,6 +15,14 @@ const OUTF= arg('out','out.docx');
 // ของที่ต่างกันระหว่างวิชาอยู่ใน subjects.json ไฟล์เดียว เพิ่มวิชาใหม่ไม่ต้องแตะไฟล์นี้
 const KEY = argv.includes('--key');          // ฉบับครู มีเฉลย
 const CAP = parseInt(arg('cap','2'),10);     // แนวเดียวกันได้ไม่เกินกี่ข้อต่อชีท (กติกาข้อ 5)
+const FCAP = parseInt(arg('fcap','4'),10);   // ตระกูลเดียวกันได้ไม่เกินกี่ข้อต่อชีท
+// ตระกูลแนว — กติกาข้อ 5 คุมได้แค่ "แนวเดียวกัน" แต่อนุกรมมีหลายแนวย่อย
+// แต่ละแนวไม่เกิน CAP ก็จริง แต่รวมกันแล้วกินพาร์ทที่ 1 ไปเกินครึ่ง จึงต้องคุมเป็นตระกูลด้วย
+const FAM = [['อนุกรม', /^(ลำดับ|อนุกรม|ปริศนาตัวอักษร)/],
+             ['กล่องและลูกเต๋า', /^(พับกล่อง|ลูกเต๋า|รูปคลี่)/],
+             ['พับกระดาษ', /^พับกระดาษ/],
+             ['เมทริกซ์', /^เมทริกซ์/]];
+const famOf = a => { for(const [f,re] of FAM) if(re.test(a)) return f; return null; };
 const SUBJ= arg('subject','tpat3');
 const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf8'))[SUBJ];
 if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
@@ -29,7 +37,10 @@ const PMETA=Object.fromEntries(SUB.parts.map(p=>[p.key,p]));
 // ตัวเลขในลิสต์คือสัดส่วนจริง เช่น [2,3,2,3,2,1] = สองดาว 3 ส่วน สามดาว 2 ส่วน หนึ่งดาว 1 ส่วน
 const PLAN={
   easy:{weave:[1,1,2,1,2,3], star:'star1.png'},
-  std :{weave:[2,3,2,3,2,1], star:'star2.png'},
+  // ติวเตอร์ทักว่า "ยังง่ายไปมากๆ" สามรอบ ชีทระดับกลางจึงไม่หยิบข้อหนึ่งดาวเลย
+  // ข้อหนึ่งดาวของพาร์ทที่ 1 เป็นอนุกรมบวกเลขคงที่ล้วน ซึ่งเป็นระดับประถม
+  // ถ้าอยากได้ข้อวอร์มกลับมา เปลี่ยนตัวท้ายของ weave เป็น 1
+  std :{weave:[3,2,3,3,2,2], star:'star2.png'},
   hard:{weave:[3,3,2,3,3,1], star:'star3.png'},
 }[MIX];
 if(!PLAN){console.error('mix ต้องเป็น easy | std | hard');process.exit(1);}
@@ -53,7 +64,13 @@ function pickPart(part,quota){
     }
     idx=rot;
   }
-  const out=[], seen=new Set(), n={};
+  // ลำดับของ *แนว* ต้องหมุนตามหมายเลขชุดด้วย ไม่งั้นชุดไหนก็นำด้วยแนวเดิมเสมอ
+  // และแนวที่เพิ่งเติมเข้าคลัง (ซึ่งอยู่ท้ายสุด) จะไม่มีวันได้เข้าชีท
+  const names=[]; idx.forEach(o=>{ if(!names.includes(o.q.arche)) names.push(o.q.arche); });
+  const rank={}; names.forEach((a,i)=>{ rank[a]=(i+setn*7)%names.length; });
+  const out=[], seen=new Set(), n={}, g={};
+  const heads=new Set();     // บรรทัดแรกของคำถามที่หยิบเข้าชีทไปแล้ว
+  const head1=q=>q.stem.split(/\r?\n/)[0].trim();
   // เก็บทีละรอบ ค่อย ๆ ผ่อนเพดานจำนวนข้อต่อแนว
   // รอบแรกจำกัดแนวละ CAP ข้อตามกติกาข้อ 5 ถ้าคลังไม่พอค่อยผ่อนทีละขั้น
   // ผลคือชีทได้หลายแนวก่อนเสมอ แทนที่จะกวาดจากหัวคลังจนแนวแรกล้น
@@ -63,14 +80,27 @@ function pickPart(part,quota){
     let stuck=0, k=0;
     while(out.length<quota && stuck<PLAN.weave.length){
       const lv=PLAN.weave[k%PLAN.weave.length]; k++;
-      let took=false;
+      // เลือกข้อที่ทำให้ชีทกว้างที่สุดก่อน ไม่ใช่ข้อแรกที่เจอในคลัง
+      let best=null, bkey=null, pos=0;
       for(const o of idx){
+        pos++;
         if(o.q.lvl!==lv || seen.has(o.i)) continue;
-        const a=o.q.arche;
+        const a=o.q.arche, f=famOf(a);
         if((n[a]||0)>=cap) continue;
-        out.push(o); seen.add(o.i); n[a]=(n[a]||0)+1; took=true; break;
+        if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
+        // ลำดับความสำคัญ: กระจายแนวก่อน แล้วเลี่ยงคำถามซ้ำคำ แล้วค่อยหมุนตามชุด
+        const key=[(n[a]||0), heads.has(head1(o.q))?1:0, rank[a], pos];
+        if(!bkey || key.some((v,z)=>v<bkey[z] && key.slice(0,z).every((u,y)=>u===bkey[y]))){
+          best=o; bkey=key;
+        }
       }
-      stuck = took ? 0 : stuck+1;
+      if(best){
+        const a=best.q.arche, f=famOf(a);
+        out.push(best); seen.add(best.i); n[a]=(n[a]||0)+1;
+        heads.add(head1(best.q));
+        if(f) g[f]=(g[f]||0)+1;
+      }
+      stuck = best ? 0 : stuck+1;
     }
   }
   // เรียงจากง่ายไปยากภายในพาร์ท (ภายในระดับเดียวกันยังจัดกลุ่มตามแนวโจทย์)
