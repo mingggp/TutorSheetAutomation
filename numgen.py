@@ -79,11 +79,14 @@ def q_seq(rng, want):
         elif kind == "diff2":
             a0, d0, dd = rng.randint(2, 9), rng.randint(1, 4), rng.randint(1, 4)
             xs, cur, step = [a0], a0, d0
+            last = d0
             for _ in range(4):
+                last = step                      # ผลต่างที่ใช้จริงในการข้ามไปพจน์สุดท้าย
                 cur += step
                 step += dd
                 xs.append(cur)
-            why = f"ผลต่างเพิ่มทีละ {dd} ขั้นถัดไปบวก {step}"
+            # เดิมใช้ step ซึ่งถูกบวกเกินไปอีกหนึ่งรอบแล้ว บรรทัดแนวคิดจึงบอกผลต่างผิดไป dd
+            why = f"ผลต่างเพิ่มทีละ {dd} ขั้นถัดไปบวก {last}"
         elif kind == "inter":
             a0, da = rng.randint(3, 12), rng.randint(3, 8)
             b0, db = rng.randint(30, 60), rng.randint(4, 9)
@@ -186,8 +189,12 @@ def q_clock(rng, want):
         if ang != int(ang) or ang == 0:
             continue
         ans = int(ang)
-        wrong = [abs(30 * h - 6 * m) if abs(30 * h - 6 * m) != ans else None,
-                 ans + 5, ans - 5, ans + 15, 360 - ans if 360 - ans != ans else None]
+        # ตัวลวงต้องไม่เกิน 180 เพราะโจทย์บอกให้ตอบมุมที่เล็กกว่า
+        # ถ้าปล่อยให้เกิน เด็กตัดตัวเลือกนั้นทิ้งได้ทันทีโดยไม่ต้องคิด
+        naive = abs(30 * h - 6 * m)                  # ลืมว่าเข็มสั้นก็เดิน
+        naive = min(naive, 360 - naive)
+        cand = [naive, ans + 5, ans - 5, ans + 15, ans - 15, ans + 30]
+        wrong = [c for c in cand if c is not None and 0 < c <= 180 and c != ans]
         return _pack("มุมเข็มนาฬิกา", 2,
                      f"เวลา {h:02d}:{m:02d} น. เข็มสั้นกับเข็มยาวทำมุมกันกี่องศา "
                      "(ตอบมุมที่เล็กกว่า)",
@@ -444,10 +451,172 @@ def q_letterseq(rng, want):
     return None
 
 
+# ================================================================ อนุกรมกลับหลักตัวเลข
+def q_revseq(rng, want):
+    """พจน์จริงเป็นกำลังสองหรือกำลังสาม แต่พิมพ์กลับหลัก ต้องกลับก่อนถึงเห็นกฎ
+
+    ถอดมาจากข้อสอบจริงที่ติวเตอร์ส่งมา เป็นแนวที่ "เปลี่ยนมุมมองก่อน" ไม่ใช่ "คำนวณหนัก"
+    ห้ามให้พจน์ลงท้ายด้วยศูนย์ เพราะกลับหลักแล้วจะมีศูนย์นำ ทำให้กำกวม
+    """
+    for _ in range(300):
+        p = rng.choice([2, 2, 3])
+        n0 = rng.randint(4, 9) if p == 2 else rng.randint(3, 5)
+        vals = [(n0 + i) ** p for i in range(6)]
+        if any(v % 10 == 0 or v < 10 for v in vals):
+            continue
+        shown = [int(str(v)[::-1]) for v in vals]
+        if len(set(shown)) < 6:
+            continue
+        ans = shown[5]
+        body = ", ".join(str(v) for v in shown[:5]) + ", ?"
+        wrong = [vals[5], shown[4] + (shown[4] - shown[3]),
+                 int(str((n0 + 6) ** p)[::-1]), ans + 9, abs(ans - 9)]
+        return _pack("อนุกรมกลับหลัก", 3,
+                     "จากอนุกรมต่อไปนี้ ตัวเลขถัดไปคือข้อใด\n" + body,
+                     ans, wrong, want,
+                     f"กลับหลักทุกพจน์ก่อน จะได้กำลัง{'สอง' if p == 2 else 'สาม'}เรียงกัน",
+                     {"vals": vals, "shown": shown, "p": p, "n0": n0})
+    return None
+
+
+# ================================================================ สัญลักษณ์แทนตัวเลข
+SHAPES = ["star", "diamond", "tri", "circle", "square"]
+
+
+def q_symsum(rng, want, tag=0):
+    """ตารางสัญลักษณ์ มีผลรวมกำกับสามแถว ถามผลรวมของแถวที่สี่
+
+    ต้องพิสูจน์ว่าค่าของสัญลักษณ์ถูกกำหนดได้ค่าเดียวจากสามสมการ
+    ไล่ค่าทุกชุดในช่วงที่ใช้จริง ถ้าเจอมากกว่าหนึ่งชุดให้ทิ้งโจทย์นั้น
+    """
+    for _ in range(500):
+        kinds = rng.sample(SHAPES, 3)
+        rows = [[rng.choice(kinds) for _ in range(4)] for _ in range(4)]
+        if any(len(set(r)) == 1 for r in rows):
+            continue
+        val = {k: rng.randint(2, 12) for k in kinds}
+        if len(set(val.values())) < 3:
+            continue
+        tot = [sum(val[c] for c in r) for r in rows]
+        # ค่าของสัญลักษณ์ต้องถูกบังคับได้ชุดเดียวจากสามแถวแรก
+        hits = []
+        for a in range(2, 13):
+            for b in range(2, 13):
+                for c in range(2, 13):
+                    cand = dict(zip(kinds, (a, b, c)))
+                    if all(sum(cand[x] for x in rows[i]) == tot[i] for i in range(3)):
+                        hits.append(cand)
+        if len(hits) != 1:
+            continue
+        ans = tot[3]
+        step = max(1, ans // 8)
+        wrong = [ans + step, ans - step, ans + 2 * step, tot[0], tot[2]]
+        return _pack("สัญลักษณ์แทนตัวเลข", 3,
+                     "ตัวเลขท้ายแถวคือผลรวมของสัญลักษณ์ในแถวนั้น\n"
+                     "สัญลักษณ์เดียวกันมีค่าเท่ากันเสมอ ผลรวมของแถวสุดท้ายคือข้อใด",
+                     ans, wrong, want,
+                     "ตั้งสมการจากสามแถวแรก แก้หาค่าของแต่ละสัญลักษณ์ก่อน",
+                     {"rows": rows, "tot": tot, "val": val, "kinds": kinds},
+                     draw=lambda t: D.symgrid(rows, tot[:3] + [None], f"sym{t}"))
+    return None
+
+
+# ================================================================ อนุกรมอักษรไทยผสมอังกฤษ
+THAI = list("กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ")
+
+
+def q_thaieng(rng, want):
+    """อักษรไทยเดินไปข้างหน้า อักษรอังกฤษเดินถอยหลัง คนละอัตรา
+
+    แนวนี้เจอในข้อสอบจริงที่ติวเตอร์ส่งมา จุดยากคือต้องแยกสองเส้นออกจากกันก่อน
+    """
+    for _ in range(200):
+        ti, dt = rng.randint(0, 6), rng.randint(1, 3)
+        ei, de = rng.randint(18, 25), rng.randint(1, 3)
+        pairs = []
+        for k in range(6):
+            t, e = ti + dt * k, ei - de * k
+            if t >= len(THAI) or e < 0:
+                break
+            pairs.append(THAI[t] + AZ[e])
+        if len(pairs) < 6:
+            continue
+        ans = pairs[5]
+        body = "   ".join(pairs[:5]) + "   ?"
+        wrong, seen = [], {ans}
+        for dtt, dee in ((1, 0), (0, 1), (-1, 0), (1, 1), (0, -1)):
+            t, e = ti + dt * 5 + dtt, ei - de * 5 + dee
+            if 0 <= t < len(THAI) and 0 <= e < 26:
+                cand = THAI[t] + AZ[e]
+                if cand not in seen:
+                    seen.add(cand)
+                    wrong.append(cand)
+        return _pack("อนุกรมอักษรไทยผสมอังกฤษ", 3,
+                     "จากอนุกรมต่อไปนี้ ลำดับถัดไปคือข้อใด\n" + body,
+                     ans, wrong, want,
+                     f"แยกสองเส้น อักษรไทยข้ามทีละ {dt} ตัว อักษรอังกฤษถอยหลังทีละ {de} ตัว",
+                     {"pairs": pairs, "dt": dt, "de": de})
+    return None
+
+
+# ================================================================ ตรรกะจริง-เท็จแบบกำหนดจำนวน
+NAMES = ["กร", "ขวัญ", "คราม", "ชมพู่", "จินนี่", "ดาว", "ตูน"]
+
+
+def q_liarcount(rng, want, n=5):
+    """บอกจำนวนคนที่พูดจริง แล้วให้หาว่าใครบ้าง
+
+    ต่างจากแบบเดิมที่ไม่บอกจำนวน การบอกจำนวนทำให้ตัดกรณีได้เร็วขึ้น
+    แต่ต้องคุมให้เหลือคำตอบชุดเดียวจริง ๆ จึงต้องไล่ครบทุกการจัดสรร
+    """
+    import itertools as _it
+    who = NAMES[:n]
+    for _ in range(600):
+        k = rng.randint(2, n - 2)
+        claims = []
+        for i in range(n):
+            j = rng.choice([x for x in range(n) if x != i])
+            claims.append((i, j, rng.random() < .5))      # i พูดว่า j พูดจริง/โกหก
+        ok = []
+        for mask in _it.product([False, True], repeat=n):
+            if sum(mask) != k:
+                continue
+            good = True
+            for i, j, says_true in claims:
+                stated = (mask[j] == says_true)
+                if mask[i] != stated:
+                    good = False
+                    break
+            if good:
+                ok.append(mask)
+        if len(ok) != 1:
+            continue
+        truth = ", ".join(who[i] for i in range(n) if ok[0][i])
+        lines = "\n".join(
+            f"    {who[i]} บอกว่า {who[j]}พูด{'ความจริง' if t else 'โกหก'}"
+            for i, j, t in claims)
+        wrong, seen = [], {truth}
+        for combo in _it.combinations(range(n), k):
+            t = ", ".join(who[i] for i in combo)
+            if t not in seen:
+                seen.add(t)
+                wrong.append(t)
+            if len(wrong) == 5:
+                break
+        return _pack("ตรรกะจริง-เท็จ", 3,
+                     f"ในกลุ่มนี้มีคนพูดความจริงเสมอ {k} คน ที่เหลือพูดโกหกเสมอ\n"
+                     + lines + "\nคนที่พูดความจริงคือใครบ้าง",
+                     truth, wrong, want,
+                     f"ไล่ทุกแบบที่มีคนพูดจริง {k} คน แล้วตัดแบบที่ขัดกับคำพูดของตัวเอง",
+                     {"claims": claims, "k": k, "n": n, "ok": ok[0], "who": who})
+    return None
+
+
 GENS = [q_seq, q_numgrid, q_customop, q_clock, q_prob,
         q_mastermind, q_dateseq, q_paths,
-        q_alnum, q_fillop, q_letterseq]
-NEEDS_TAG = {"q_numgrid", "q_mastermind", "q_paths"}
+        q_alnum, q_fillop, q_letterseq,
+        q_revseq, q_symsum, q_thaieng, q_liarcount]
+NEEDS_TAG = {"q_numgrid", "q_mastermind", "q_paths", "q_symsum"}
 
 
 def build(add, part, rng, per=6):
@@ -505,9 +674,16 @@ if __name__ == "__main__":
                 got = ch[r["ansIdx"]]
                 if g.__name__ == "q_seq":
                     ck(str(p["xs"][-1]) == got, f"ลำดับ s={s}: เฉลยไม่ใช่พจน์ถัดไป")
+                    if p["kind"] == "diff2":
+                        # บรรทัดแนวคิดต้องบอกผลต่างจริงของขั้นสุดท้าย ไม่ใช่ขั้นถัดไปอีกขั้น
+                        real = p["xs"][-1] - p["xs"][-2]
+                        ck(f"บวก {real}" in r["why"],
+                           f"ลำดับ s={s}: แนวคิดบอกผลต่างผิด ควรเป็น {real}")
                 elif g.__name__ == "q_clock":
                     a = abs((30 * p["h"] + 0.5 * p["m"]) - 6 * p["m"])
                     ck(str(int(min(a, 360 - a))) == got, f"นาฬิกา s={s}: มุมไม่ตรง")
+                    ck(all(0 < int(x) <= 180 for x in ch),
+                       f"นาฬิกา s={s}: มีตัวเลือกเกิน 180 องศา {ch}")
                 elif g.__name__ == "q_prob":
                     ck(F(got) == F(p["cnt"], 36), f"ความน่าจะเป็น s={s}: ค่าไม่ตรง")
                 elif g.__name__ == "q_mastermind":
@@ -526,6 +702,24 @@ if __name__ == "__main__":
                     ck(" ".join(p["hit"][0]) == got, f"เติมเครื่องหมาย s={s}: เฉลยไม่ตรง")
                 elif g.__name__ == "q_letterseq":
                     ck(AZ[p["idx"][4]] == got, f"ปริศนาตัวอักษร s={s}: เฉลยไม่ตรง")
+                elif g.__name__ == "q_revseq":
+                    ck(str(p["shown"][5]) == got, f"กลับหลัก s={s}: เฉลยไม่ตรง")
+                    ck(all(int(str(v)[::-1]) == w
+                           for v, w in zip(p["vals"], p["shown"])),
+                       f"กลับหลัก s={s}: กลับหลักไม่ตรงกับพจน์จริง")
+                elif g.__name__ == "q_symsum":
+                    ck(str(p["tot"][3]) == got, f"สัญลักษณ์ s={s}: ผลรวมไม่ตรง")
+                    ck(all(sum(p["val"][c] for c in r) == t
+                           for r, t in zip(p["rows"], p["tot"])),
+                       f"สัญลักษณ์ s={s}: ผลรวมแถวไม่ตรงกับค่าที่ตั้ง")
+                elif g.__name__ == "q_thaieng":
+                    ck(p["pairs"][5] == got, f"ไทยผสมอังกฤษ s={s}: เฉลยไม่ตรง")
+                elif g.__name__ == "q_liarcount":
+                    ok, who, claims = p["ok"], p["who"], p["claims"]
+                    ck(", ".join(who[i] for i in range(p["n"]) if ok[i]) == got,
+                       f"จริงเท็จ s={s}: เฉลยไม่ตรง")
+                    for i, j, t in claims:      # ทุกคำพูดต้องสอดคล้องกับสถานะที่เฉลย
+                        ck(ok[i] == (ok[j] == t), f"จริงเท็จ s={s}: คำพูดขัดกับเฉลย")
 
     for k in range(5):
         if pos.get(k, 0) == 0:

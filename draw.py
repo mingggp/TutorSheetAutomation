@@ -1201,3 +1201,55 @@ def bulb_states(s0, s1, s2, s3):
     """
     power = s0
     return (power and s1, power and s3, power and s3 and not s2)
+
+
+# ================================================================ สัญลักษณ์แทนตัวเลข
+def _shape(d, kind, cx, cy, r, lw):
+    """วาดรูปสัญลักษณ์ด้วยเรขาคณิต ไม่ใช้ตัวอักษร
+
+    ฟอนต์ Sarabun ไม่มีอักขระดาวหรือข้าวหลามตัดที่ใช้ได้แน่นอน
+    วาดเองจึงคุมหน้าตาได้และไม่เสี่ยงกลายเป็นกล่องว่าง
+    """
+    import math
+    if kind == "circle":
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=INK)
+    elif kind == "square":
+        d.rectangle([cx - r * .86, cy - r * .86, cx + r * .86, cy + r * .86], fill=INK)
+    elif kind == "tri":
+        d.polygon([(cx, cy - r), (cx - r * .92, cy + r * .75),
+                   (cx + r * .92, cy + r * .75)], fill=INK)
+    elif kind == "diamond":
+        d.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=INK)
+    else:                                   # ดาวห้าแฉก
+        pts = []
+        for k in range(10):
+            a = math.radians(-90 + k * 36)
+            rr = r if k % 2 == 0 else r * .44
+            pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
+        d.polygon(pts, fill=INK)
+
+
+def symgrid(rows, sums, name, cell=34, pad=12):
+    """ตารางสัญลักษณ์พร้อมผลรวมกำกับท้ายแถว
+
+    rows = list ของ list ชื่อรูป · sums = ผลรวมของแต่ละแถว ใส่ None เพื่อให้เป็นช่องคำถาม
+    แนวนี้ข้อสอบจริงออกราว 3 เปอร์เซ็นต์ (ดู DIGEST-part2) แต่โรงงานยังไม่เคยทำ
+    """
+    R, C = len(rows), len(rows[0])
+    W = pad * 2 + C * cell + 46
+    H = pad * 2 + R * cell
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    f = font(15, True)
+    for r in range(R):
+        for c in range(C):
+            x0, y0 = (pad + c * cell) * S, (pad + r * cell) * S
+            d.rectangle([x0, y0, x0 + cell * S, y0 + cell * S],
+                        outline=LINEG, width=lw)
+            _shape(d, rows[r][c], x0 + cell * S / 2, y0 + cell * S / 2,
+                   cell * S * .30, lw)
+        lab = "?" if sums[r] is None else str(sums[r])
+        d.text(((pad + C * cell + 12) * S, (pad + r * cell + cell * .28) * S),
+               lab, font=f, fill=INK)
+    return _save(im, W, H, name)

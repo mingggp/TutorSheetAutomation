@@ -62,6 +62,11 @@ OPS = {
     "a×(b+1)":      lambda a, b: a * (b + 1),
     "2a + 3b":      lambda a, b: 2 * a + 3 * b,
     "3a − b":       lambda a, b: 3 * a - b,
+    # สามกฎล่างนี้ถอดมาจากข้อสอบจริงที่ติวเตอร์ส่งมา (ดู DIGEST-from-tutor)
+    # โดยเฉพาะ b(a+b)+a ซึ่งติวเตอร์ลองผิดสองรอบกว่าจะเจอ เป็นกฎที่คนคิดไม่ถึง
+    "b×(a+b) + a":  lambda a, b: b * (a + b) + a,
+    "a×(a+b) − b":  lambda a, b: a * (a + b) - b,
+    "(a+b)² − a×b": lambda a, b: (a + b) ** 2 - a * b,
 }
 OPNAMES = list(OPS)
 

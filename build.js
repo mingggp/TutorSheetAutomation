@@ -23,10 +23,14 @@ const PMETA=Object.fromEntries(SUB.parts.map(p=>[p.key,p]));
 // ลำดับการหยิบตามระดับดาว ตัวแรกคือระดับหลักของชีท ที่เหลือคือตัวเติม
 // ชีทระดับกลางเติมด้วยข้อยากก่อนข้อง่าย เพราะข้อสอบความถนัดต้องมีข้อที่ยืดเพดานให้เด็ก
 // (เดิมเติมด้วยข้อง่ายก่อน ทำให้ชีท 50 ข้อไม่มีข้อสามดาวเลยสักข้อ)
+// weave = ลำดับระดับดาวที่จะหยิบ *ทีละข้อ* วนไปเรื่อย ๆ
+// เดิมใช้ prio ซึ่งไล่เก็บระดับแรกจนหมดก่อน พอคลังสองดาวใหญ่ขึ้น
+// ข้อสามดาวเลยแทบไม่ได้เข้าชีท ทำให้ชีทง่ายกว่าที่ตั้งใจ
+// ตัวเลขในลิสต์คือสัดส่วนจริง เช่น [2,3,2,3,2,1] = สองดาว 3 ส่วน สามดาว 2 ส่วน หนึ่งดาว 1 ส่วน
 const PLAN={
-  easy:{prio:[1,2,3], star:'star1.png'},
-  std :{prio:[2,3,1], star:'star2.png'},
-  hard:{prio:[3,2,1], star:'star3.png'},
+  easy:{weave:[1,1,2,1,2,3], star:'star1.png'},
+  std :{weave:[2,3,2,3,2,1], star:'star2.png'},
+  hard:{weave:[3,3,2,3,3,1], star:'star3.png'},
 }[MIX];
 if(!PLAN){console.error('mix ต้องเป็น easy | std | hard');process.exit(1);}
 
@@ -53,16 +57,20 @@ function pickPart(part,quota){
   // เก็บทีละรอบ ค่อย ๆ ผ่อนเพดานจำนวนข้อต่อแนว
   // รอบแรกจำกัดแนวละ CAP ข้อตามกติกาข้อ 5 ถ้าคลังไม่พอค่อยผ่อนทีละขั้น
   // ผลคือชีทได้หลายแนวก่อนเสมอ แทนที่จะกวาดจากหัวคลังจนแนวแรกล้น
+  // หยิบทีละข้อตามลำดับใน weave วนไปเรื่อย ๆ ถ้าระดับนั้นหมดแล้วค่อยข้ามไป
+  // ทำให้ชีทได้สัดส่วนดาวตามที่ตั้งใจจริง ไม่ใช่เก็บระดับแรกจนหมดก่อน
   for(let cap=CAP; cap<=quota && out.length<quota; cap++){
-    for(const lv of PLAN.prio){
+    let stuck=0, k=0;
+    while(out.length<quota && stuck<PLAN.weave.length){
+      const lv=PLAN.weave[k%PLAN.weave.length]; k++;
+      let took=false;
       for(const o of idx){
-        if(out.length>=quota) break;
         if(o.q.lvl!==lv || seen.has(o.i)) continue;
         const a=o.q.arche;
         if((n[a]||0)>=cap) continue;
-        out.push(o); seen.add(o.i); n[a]=(n[a]||0)+1;
+        out.push(o); seen.add(o.i); n[a]=(n[a]||0)+1; took=true; break;
       }
-      if(out.length>=quota) break;
+      stuck = took ? 0 : stuck+1;
     }
   }
   // เรียงจากง่ายไปยากภายในพาร์ท (ภายในระดับเดียวกันยังจัดกลุ่มตามแนวโจทย์)
