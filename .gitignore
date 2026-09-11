@@ -6,3 +6,12 @@ __pycache__/
 *.pdf
 .claude/dash/activity.jsonl
 .claude/settings.local.json
+
+# รูปถ่ายโจทย์จากติวเตอร์ — ลิขสิทธิ์ของผู้อื่น ห้ามขึ้น GitHub เช่นเดียวกับ PDF (กติกาข้อ 3)
+# ครอบทั้ง jpg จากแอนดรอยด์ และ heic จากไอโฟน
+reference/**/*.jpg
+reference/**/*.jpeg
+reference/**/*.png
+reference/**/*.heic
+reference/**/*.heif
+reference/**/*.webp
