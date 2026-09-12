@@ -170,9 +170,13 @@ def odd_q(rng, want=0, tag=0, n=4):
     ถ้าจำนวนจุดไม่เท่ากัน เด็กอาจชี้รูปอื่นว่าไม่เข้าพวกด้วยเหตุผลที่ก็ฟังขึ้น
     """
     for _ in range(300):
-        total = rng.choice([9, 10, 12])
-        fa = rng.randrange(2, total - 1)
-        fb = rng.randrange(2, total - 1)
+        # ติวเตอร์ว่า "ง่ายเกินไปแบบชัดเจนมาก" เพราะสัดส่วนเดิมต่างกันมากจนเห็นด้วยตาเปล่า
+        # บังคับให้จุดทึบต่างกันแค่หนึ่งจุด ต้องนับจริงทั้งห้ารูปถึงจะรู้ว่ารูปไหนหลุด
+        total = rng.choice([10, 11, 12, 13])
+        fa = rng.randrange(3, total - 2)
+        fb = fa + rng.choice([-2, -1, 1, 2])
+        if not 2 <= fb <= total - 2:
+            continue
         if _ratio(fa, total - fa) == _ratio(fb, total - fb):
             continue
         cells = [(r, c) for r in range(n) for c in range(n)]
@@ -254,7 +258,7 @@ def build(add, P2, rng):
             "ทุกตารางมีจุดรวมเท่ากัน แต่มีตารางหนึ่งที่ไม่เข้าพวกกับอีกสี่ตาราง\n"
             "ตารางในข้อใดไม่เข้าพวก",
             [""] * 5, r["ansIdx"], optimg=D.strip(files, f"fooopt{qi}"),
-            lvl=2, why=f"เทียบอัตราส่วนจุดทึบต่อจุดโปร่ง สี่รูปได้ "
+            lvl=3, why=f"เทียบอัตราส่วนจุดทึบต่อจุดโปร่ง สี่รูปได้ "
                        f"{r['ratio'][0]}:{r['ratio'][1]} อีกรูปไม่ใช่")
         want = (want + 2) % 5
 

@@ -56,12 +56,22 @@ def _solve(top, fx, sy):
     return None if lo is None else (lo, hi)
 
 
-def _plates(top, fx, sy, cell=26):
+def _plates(top, fx, sy, cell=30):
     """ภาพฉายสามด้าน — ด้านหน้ากับด้านข้างเป็นเงา จึงทึบจากพื้นขึ้นไปเสมอ"""
     zz = max(max(fx), max(sy))
     front = [[1 if zz - z <= fx[x] else 0 for x in range(N)] for z in range(zz)]
     side = [[1 if zz - z <= sy[y] else 0 for y in range(N)] for z in range(zz)]
     return front, side, [list(r) for r in top], cell
+
+
+def _sheet(rows, name, cell):
+    """ตารางสีแบรนด์แบบเดียวกับข้อภาพฉายอื่นในชีท ไม่ใช่ตารางดำ
+
+    ในชีทเดียวกันมีข้อ "ภาพฉาย -> ทรง" ที่วาดด้วย draw.grid อยู่แล้ว
+    ถ้าตัวนี้ใช้ draw.plate จะได้สองสไตล์ปนกันทั้งที่เป็นรูปชนิดเดียวกัน
+    """
+    filled = [(r, c) for r, row in enumerate(rows) for c, v in enumerate(row) if v]
+    return D.grid(len(rows), len(rows[0]), filled=filled, name=name, cell=cell)
 
 
 def view_q(rng, want=0, tag=0, ask="min"):
@@ -186,9 +196,9 @@ def build(add, P2, rng):
         if not r:
             continue
         front, side, top, cell = _plates(r["top"], r["fx"], r["sy"])
-        img = D.views([D.plate(front, f"cvf{qi}", cell=cell),
-                       D.plate(side, f"cvs{qi}", cell=cell),
-                       D.plate(top, f"cvt{qi}", cell=cell)], f"cvq{qi}")
+        img = D.views([_sheet(front, f"cvf{qi}", cell),
+                       _sheet(side, f"cvs{qi}", cell),
+                       _sheet(top, f"cvt{qi}", cell)], f"cvq{qi}")
         word = "น้อยที่สุด" if ask == "min" else "มากที่สุด"
         add(P2, "ภาพฉายสามด้าน · นับลูกบาศก์",
             "นำลูกบาศก์ขนาดเท่ากันมาวางซ้อนกันบนพื้น จนมองเห็นเป็นภาพฉายสามด้านดังรูป\n"

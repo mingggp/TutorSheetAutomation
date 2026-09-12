@@ -126,13 +126,21 @@ def hm_vox(hm):
     return [(x, y, z) for y, r in enumerate(hm) for x, h in enumerate(r) for z in range(h)]
 
 # ---------------------------------------------------------------- 2D grid
-def grid(rows, cols, filled=(), holes=(), name="g", cell=22, pad=8, text=None, center=None):
-    W, H = cols * cell + pad * 2, rows * cell + pad * 2
+def grid(rows, cols, filled=(), holes=(), name="g", cell=22, pad=8, text=None,
+         center=None, ends=None):
+    """ends = (ป้ายมุมซ้ายบน, ป้ายมุมขวาล่าง) เช่น ("Start", "End")
+
+    ติวเตอร์ขอให้โจทย์นับเส้นทางกำกับจุดเริ่มกับจุดจบไว้ จะได้ไม่ต้องเดาจากคำสั่ง
+    ป้ายวางนอกตาราง จึงไม่บังช่องที่ระบายทึบ
+    """
+    lab = pad + 15 if ends else 0
+    W, H = cols * cell + pad * 2, rows * cell + pad * 2 + lab * 2
     im = Image.new("RGB", (W * S, H * S), "white"); d = ImageDraw.Draw(im)
     f = font(15, True)
+    top = pad + lab
     for r in range(rows):
         for c in range(cols):
-            x0, y0 = (pad + c * cell) * S, (pad + r * cell) * S
+            x0, y0 = (pad + c * cell) * S, (top + r * cell) * S
             x1, y1 = x0 + cell * S, y0 + cell * S
             d.rectangle([x0, y0, x1, y1], fill=TOPF if (r, c) in filled else "white",
                         outline=(196, 204, 206), width=max(1, S // 2))
@@ -143,7 +151,13 @@ def grid(rows, cols, filled=(), holes=(), name="g", cell=22, pad=8, text=None, c
                 t = text[(r, c)]
                 tw = d.textlength(t, font=f)
                 d.text((x0 + (cell*S - tw)/2, y0 + cell*S*.16), t, font=f, fill=INK)
-    d.rectangle([pad*S, pad*S, (pad+cols*cell)*S, (pad+rows*cell)*S], outline=INK, width=S)
+    d.rectangle([pad*S, top*S, (pad+cols*cell)*S, (top+rows*cell)*S], outline=INK, width=S)
+    if ends:
+        fe = font(14, True)
+        d.text((pad * S, (top - 17) * S), ends[0], font=fe, fill=INK)
+        tw = d.textlength(ends[1], font=fe)
+        d.text(((pad + cols * cell) * S - tw, (top + rows * cell + 3) * S),
+               ends[1], font=fe, fill=INK)
     if center:
         fc = font(int(cell * 1.15), True)
         tw = d.textlength(center, font=fc)

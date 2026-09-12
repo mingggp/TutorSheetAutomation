@@ -123,19 +123,44 @@ def build(add, addnum, P1, P2):
         rng = random.Random(3100 + qi + SEED * 104729)
         cl = sorted(cells)
         labels = {c: LETT[i] for i, c in enumerate(cl)}
-        dirs = C.label_dirs(cells, labels)
-        good = sorted(C.triples(dirs))
+        frames = C.frames_of(cells)
+        good = sorted(C.oriented(frames, labels))
+        gset = set(good)
         correct = rng.choice(good)
-        bad = [t for t in itertools.permutations(LETT, 3) if t not in set(good)]
+        plain = {C.faces_of(v) for v in good}
+
+        # ตัวลวงสองชนิด ใช้ทั้งคู่ในข้อเดียว
+        #   ชนิดที่ 1 สามหน้านั้นมาอยู่ด้วยกันไม่ได้เลย — แก้ได้ด้วยการดูคู่ตรงข้าม
+        #   ชนิดที่ 2 หน้าถูกหมดแต่ตัวอักษรตะแคงผิด — ต้องไล่ทีละหน้า ยากกว่ามาก
+        # เดิมมีแต่ชนิดที่ 1 และตัวอักษรถูกวาดตั้งตรงเสมอ ชนิดที่ 2 จึงเกิดขึ้นไม่ได้
+        picked, seen = [], {C.faces_of(correct)}
+        spun = []
+        for _ in range(300):
+            v = list(correct)
+            i = rng.randrange(3)                 # ต้องเป็นหน้าเดียวกันทั้งซ้ายและขวาของเครื่องหมายเท่ากับ
+            v[i] = C.spin(v[i], rng.choice([1, 2, 3]))
+            v = tuple(v)
+            if v == correct or v in gset or v in spun:
+                continue
+            spun.append(v)
+            if len(spun) == 2:
+                break
+        bad = [t for t in itertools.permutations(LETT, 3) if t not in plain]
         rng.shuffle(bad)
-        picked, seen = [], {frozenset(correct)}
         for t in bad:
-            if frozenset(t) in seen: continue
-            seen.add(frozenset(t)); picked.append(t)
-            if len(picked) == 4: break
-        cands = [correct] + picked
+            if frozenset(t) in {frozenset(x) for x in seen}:
+                continue
+            seen.add(t)
+            picked.append(tuple((t[i], correct[i][1], correct[i][2]) for i in range(3)))
+            if len(picked) == 4 - len(spun):
+                break
+        cands = [correct] + spun + picked
+        # กติกาข้อ 1 — ต้องมีตัวเลือกเดียวที่เป็นมุมมองจริงของลูกบาศก์ที่พับได้
+        # ตัวลวงแบบตะแคงผิดอันตรายตรงที่ถ้าเผลอหมุนไปตรงกับมุมมองจริง จะมีคำตอบถูกสองข้อ
+        assert sum(1 for c in cands if c in gset) == 1, "พับกล่อง: ตัวเลือกถูกไม่ได้มีข้อเดียว"
+        assert len({tuple(f[0] for f in c) for c in cands}) >= 3, "พับกล่อง: ชุดตัวอักษรซ้ำเกินไป"
         order = list(range(5)); rng.shuffle(order)
-        files = [D.iso([(0,0,0)], f"hn{qi}o{j}", cell=32, ch=27, labels=cands[o]) for j, o in enumerate(order)]
+        files = [D.iso([(0,0,0)], f"hn{qi}o{j}", cell=36, ch=31, labels=cands[o]) for j, o in enumerate(order)]
         add(P2, "พับกล่อง / รูปคลี่", "เมื่อพับรูปคลี่นี้ขึ้นเป็นลูกบาศก์ จะได้ลูกบาศก์ตรงกับข้อใด",
             [""]*5, order.index(0),
             img=D.netshape(cells, labels, f"hn{qi}stem", cell=34),
@@ -197,7 +222,7 @@ def build(add, addnum, P1, P2):
     labels = dict(zip(sorted(cross), ["ก","ข","ค","ง","จ","ฉ"]))
     dirs = C.label_dirs(cross, labels)
     letters = sorted(labels.values())
-    good = sorted(C.triples(dirs))
+    good = sorted(C.oriented(C.frames_of(cross), labels))
     rng = random.Random(3500 + SEED * 104729)
 
     def matchings(items):
@@ -211,11 +236,12 @@ def build(add, addnum, P1, P2):
     chosen = None
     for _ in range(800):
         vs3 = rng.sample(good, 3)
+        seen3 = [C.faces_of(v) for v in vs3]
         ok = [m for m in matchings(letters)
-              if all(not any(x in v and y in v for v in vs3) for (x, y) in m)]
+              if all(not any(x in v and y in v for v in seen3) for (x, y) in m)]
         if len(ok) == 1: chosen = vs3; break
     assert chosen
-    files = [D.iso([(0,0,0)], f"hdc{j}", cell=32, ch=27, labels=v) for j, v in enumerate(chosen)]
+    files = [D.iso([(0,0,0)], f"hdc{j}", cell=40, ch=34, labels=v) for j, v in enumerate(chosen)]
     stem = D.compose(files, "hdcstem", seps=["", ""], gap=30,
                      capt=["ภาพที่ 1", "ภาพที่ 2", "ภาพที่ 3"])
     true_pair = (letters[0], C.opposite(dirs, letters[0]))

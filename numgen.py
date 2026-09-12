@@ -156,29 +156,73 @@ def q_numgrid(rng, want, tag=0):
 
 # ================================================================ การดำเนินการสมมติ
 def q_customop(rng, want):
-    """นิยามตัวดำเนินการให้ แล้วถามค่าที่ต้องแทนซ้อนกันสองชั้น"""
+    """นิยามตัวดำเนินการให้ แล้วถามสามแบบ
+
+    nest   แทนซ้อนสองชั้น ((a b) c) — แบบพื้นฐาน
+    cross  (a b) กับ (b a) แล้วเอามาดำเนินการกันอีกที
+           ต้องสังเกตให้ได้ว่าตัวดำเนินการนี้สลับที่ไม่ได้ ซึ่งเป็นจุดที่คนพลาด
+    solve  ให้ผลลัพธ์มา แล้วถามตัวตั้ง — ต้องแก้ย้อน และต้องยืนยันว่าคำตอบมีค่าเดียว
+    """
     forms = [("{p}a − {q}b", lambda a, b, p, q: p * a - q * b),
              ("{p}a + {q}b", lambda a, b, p, q: p * a + q * b),
              ("a×b − {q}", lambda a, b, p, q: a * b - q),
-             ("{p}(a + b)", lambda a, b, p, q: p * (a + b))]
-    for _ in range(200):
+             ("{p}(a + b)", lambda a, b, p, q: p * (a + b)),
+             ("a² − {q}b", lambda a, b, p, q: a * a - q * b),
+             ("{p}a − b²", lambda a, b, p, q: p * a - b * b),
+             ("a×b − a − b", lambda a, b, p, q: a * b - a - b)]
+    mode = rng.choice(["nest", "cross", "cross", "solve", "solve"])
+    for _ in range(300):
         name, f = rng.choice(forms)
         p, q = rng.randint(2, 4), rng.randint(1, 5)
         a, b, c = (rng.randint(2, 9) for _ in range(3))
-        inner = f(a, b, p, q)
-        ans = f(inner, c, p, q)
-        if not (1 <= inner <= 90) or not (1 <= ans <= 400):
-            continue
         sym = rng.choice(["✦", "◆", "★", "▲", "●"])
-        expr = name.format(p=p, q=q).replace("a", "a").replace("b", "b")
-        step = max(1, abs(ans) // 8)
-        wrong = [f(a, f(b, c, p, q), p, q), ans + step, ans - step, ans + 2 * step, inner]
-        return _pack("การดำเนินการสมมติ", 2,
-                     f"กำหนดให้  a {sym} b = {expr}\n"
-                     f"จงหาค่าของ  ({a} {sym} {b}) {sym} {c}",
-                     ans, wrong, want,
-                     f"ทำวงเล็บในก่อน ได้ {inner} แล้วค่อยทำกับ {c}",
-                     {"a": a, "b": b, "c": c, "p": p, "q": q, "name": name})
+        # สัมประสิทธิ์ 1 ไม่ต้องพิมพ์ ไม่งั้นได้ "2a + 1b" ซึ่งไม่มีใครเขียนกัน
+        expr = name.format(p=p, q=q).replace("1a", "a").replace("1b", "b")
+        head = f"กำหนดให้  a {sym} b = {expr}"
+
+        if mode == "nest":
+            inner = f(a, b, p, q)
+            ans = f(inner, c, p, q)
+            if not (1 <= inner <= 90) or not (1 <= ans <= 400):
+                continue
+            step = max(1, abs(ans) // 8)
+            wrong = [f(a, f(b, c, p, q), p, q), ans + step, ans - step,
+                     ans + 2 * step, inner]
+            return _pack("การดำเนินการสมมติ", 2,
+                         head + NL + f"จงหาค่าของ  ({a} {sym} {b}) {sym} {c}",
+                         ans, wrong, want,
+                         f"ทำวงเล็บในก่อน ได้ {inner} แล้วค่อยทำกับ {c}",
+                         {"a": a, "b": b, "c": c, "mode": mode})
+
+        if mode == "cross":
+            u, v = f(a, b, p, q), f(b, a, p, q)
+            if u == v:
+                continue                      # สลับที่แล้วได้เท่าเดิม ข้อนี้ไม่วัดอะไร
+            ans = f(u, v, p, q)
+            if not (1 <= u <= 90 and 1 <= v <= 90) or not (1 <= ans <= 900):
+                continue
+            step = max(1, abs(ans) // 8)
+            wrong = [f(v, u, p, q), f(u, u, p, q), ans + step, ans - step, u + v]
+            return _pack("การดำเนินการสมมติ", 3,
+                         head + NL +
+                         f"จงหาค่าของ  ({a} {sym} {b}) {sym} ({b} {sym} {a})",
+                         ans, wrong, want,
+                         "ตัวดำเนินการนี้สลับที่ไม่ได้ วงเล็บซ้ายกับขวาจึงได้คนละค่า",
+                         {"a": a, "b": b, "mode": mode})
+
+        if mode == "solve":
+            k = f(a, b, p, q)
+            if not (1 <= k <= 300):
+                continue
+            hit = [x for x in range(-20, 61) if f(x, b, p, q) == k]
+            if hit != [a]:
+                continue                      # มีตัวตั้งได้หลายค่า จะมีคำตอบถูกหลายข้อ
+            wrong = [b, k - b, a + 1, a - 1, a + 3, k // max(1, b)]
+            return _pack("การดำเนินการสมมติ", 3,
+                         head + NL + f"ถ้า  x {sym} {b} = {k}  จงหาค่าของ x",
+                         a, wrong, want,
+                         f"แทนนิยามแล้วแก้สมการย้อนกลับ โดยมี b = {b} ที่รู้ค่าแล้ว",
+                         {"b": b, "k": k, "mode": mode})
     return None
 
 
@@ -254,6 +298,15 @@ def q_mastermind(rng, want, tag=0):
                 break
         if len(pool) != 1 or len(clues) < 2:
             continue
+        # ติวเตอร์ว่าแนวนี้ดีแต่ครั้งแรกยากไปเพราะมีคำใบ้แค่สี่บรรทัด
+        # เติมอีกหนึ่งบรรทัดที่ไม่ขัดกับรหัส ช่วยให้ไล่ทานได้ ความยากของกฎยังเท่าเดิม
+        for _ in range(60):
+            g = tuple(rng.sample(digits, 4))
+            if g == code or any(g == c[0] for c in clues):
+                continue
+            b, w = _pegs(g, code)
+            clues.append((g, b, w))
+            break
         lines = "\n".join(f"    {' '.join(map(str, g))}   ดำ {b} · ขาว {w}"
                           for g, b, w in clues)
         ans = "".join(map(str, code))
@@ -343,7 +396,8 @@ def q_paths(rng, want, tag=0):
                      "ไล่เติมจำนวนเส้นทางทีละช่องจากซ้ายบน แต่ละช่องเท่ากับช่องบนบวกช่องซ้าย",
                      {"R": R, "C": C, "holes": sorted(holes), "ans": ans},
                      draw=lambda t: D.grid(R, C, filled=sorted(holes),
-                                           name=f"pth{t}", cell=26))
+                                           name=f"pth{t}", cell=26,
+                                           ends=("Start", "End")))
     return None
 
 
@@ -428,30 +482,64 @@ def q_fillop(rng, want):
 
 # ================================================================ ปริศนาตัวอักษร
 def q_letterseq(rng, want):
-    """ลำดับตัวอักษรที่ระยะห่างเดินตามกฎ — เดิมเขียนไว้ตายตัวสามข้อ"""
-    for _ in range(200):
-        i0 = rng.randint(0, 5)
-        g0, dg = rng.randint(1, 3), rng.randint(1, 2)
-        idx, cur, gap = [i0], i0, g0
-        for _ in range(4):
-            cur += gap
-            gap += dg
-            idx.append(cur)
-        if idx[-1] >= 26:
-            continue
-        shown = ", ".join(AZ[i] for i in idx[:4]) + ", ?"
-        ans = AZ[idx[4]]
+    """ลำดับตัวอักษรสี่กฎ — เดิมมีกฎเดียวคือระยะห่างเพิ่มทีละคงที่ ซึ่งติวเตอร์ว่าง่ายไป
+
+    gap   ระยะห่างเพิ่มทีละคงที่ (ของเดิม)
+    pair  สองชุดสลับกัน ชุดหนึ่งเดินหน้า อีกชุดเดินถอยหลังจากท้ายตัวอักษร
+    wrap  ก้าวคงที่แต่ก้าวใหญ่และวนรอบตัวอักษร ทำให้มองไม่ออกว่าเป็นก้าวคงที่
+    sq    ตำแหน่งเป็นกำลังสองของลำดับที่ แล้ววนรอบ
+    """
+    kind = rng.choice(["gap", "pair", "pair", "wrap", "sq"])
+    for _ in range(300):
+        if kind == "gap":
+            i0 = rng.randint(0, 5)
+            g0, dg = rng.randint(1, 3), rng.randint(1, 2)
+            idx, cur, gap = [i0], i0, g0
+            for _ in range(4):
+                cur += gap
+                gap += dg
+                idx.append(cur)
+            if idx[-1] >= 26:
+                continue
+            why = f"แปลงเป็นลำดับที่ก่อน ระยะห่างเริ่มที่ {g0} แล้วเพิ่มทีละ {dg}"
+
+        elif kind == "pair":
+            i0, d1 = rng.randint(0, 6), rng.randint(2, 4)
+            j0, d2 = rng.randint(19, 25), rng.randint(2, 4)
+            A = [i0 + d1 * t for t in range(4)]
+            B = [j0 - d2 * t for t in range(3)]
+            if max(A) >= 26 or min(B) < 0:
+                continue
+            idx = [A[0], B[0], A[1], B[1], A[2], B[2], A[3]]
+            why = f"สลับสองชุด ชุดคี่เดินหน้าทีละ {d1} ชุดคู่ถอยหลังทีละ {d2}"
+
+        elif kind == "wrap":
+            i0, st = rng.randint(0, 25), rng.choice([7, 9, 11, 15])
+            idx = [(i0 + st * t) % 26 for t in range(5)]
+            if len(set(idx)) < 5:
+                continue
+            why = f"ก้าวทีละ {st} ตัวอักษร พอเลย Z แล้ววนกลับมาที่ A"
+
+        else:
+            i0 = rng.randint(0, 9)
+            idx = [(i0 + t * t) % 26 for t in range(5)]
+            if len(set(idx)) < 5:
+                continue
+            why = "ระยะห่างคือเลขคี่ไล่ขึ้น 1 3 5 7 ซึ่งก็คือผลต่างของกำลังสอง"
+
+        if len(set(idx)) < len(idx):
+            continue            # ตัวอักษรซ้ำในลำดับ จะอ่านกฎได้หลายทาง
+        shown = ", ".join(AZ[i] for i in idx[:-1]) + ", ?"
+        ans = AZ[idx[-1]]
         wrong, seen = [], {ans}
-        for off in (-2, -1, 1, 2, 3):
-            j = idx[4] + off
-            if 0 <= j < 26 and AZ[j] not in seen:
+        for off in (-2, -1, 1, 2, 3, 4):
+            j = (idx[-1] + off) % 26
+            if AZ[j] not in seen:
                 seen.add(AZ[j])
                 wrong.append(AZ[j])
-        return _pack("ปริศนาตัวอักษร", 2,
-                     "จากลำดับตัวอักษรต่อไปนี้ ตัวถัดไปคือข้อใด\n" + shown,
-                     ans, wrong, want,
-                     f"แปลงเป็นลำดับที่ก่อน ระยะห่างเริ่มที่ {g0} แล้วเพิ่มทีละ {dg}",
-                     {"idx": idx})
+        return _pack("ปริศนาตัวอักษร", 2 if kind == "gap" else 3,
+                     "จากลำดับตัวอักษรต่อไปนี้ ตัวถัดไปคือข้อใด" + NL + shown,
+                     ans, wrong, want, why, {"idx": idx, "kind": kind})
     return None
 
 
@@ -1046,7 +1134,9 @@ if __name__ == "__main__":
                     ck(len(p["hit"]) == 1, f"เติมเครื่องหมาย s={s}: มีคำตอบมากกว่าหนึ่งชุด")
                     ck(" ".join(p["hit"][0]) == got, f"เติมเครื่องหมาย s={s}: เฉลยไม่ตรง")
                 elif g.__name__ == "q_letterseq":
-                    ck(AZ[p["idx"][4]] == got, f"ปริศนาตัวอักษร s={s}: เฉลยไม่ตรง")
+                    ck(AZ[p["idx"][-1]] == got, f"ปริศนาตัวอักษร s={s}: เฉลยไม่ตรง")
+                    ck(len(set(p["idx"])) == len(p["idx"]),
+                       f"ปริศนาตัวอักษร s={s}: มีตัวอักษรซ้ำในลำดับ")
                 elif g.__name__ == "q_revseq":
                     ck(str(p["shown"][5]) == got, f"กลับหลัก s={s}: เฉลยไม่ตรง")
                     ck(all(int(str(v)[::-1]) == w

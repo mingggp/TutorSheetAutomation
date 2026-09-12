@@ -66,6 +66,44 @@ def triples(dirs_to_label):
         out.add((f[UP], f[RT], f[BK]))
     return out
 
+# สลับแกน x กับ y = พลิกภาพหนึ่งครั้ง ใช้หักล้างกับการฉายภาพของ draw.iso ที่พลิกอยู่แล้ว
+# (เหตุผลเต็มอยู่ใน gen._no_mirror_check ซึ่งพิสูจน์ครบทั้ง 24 มุมหมุน)
+MIR = lambda v: (v[1], v[0], v[2])
+
+
+def oriented(frames, labels):
+    """เหมือน triples() แต่พกทิศการตะแคงของตัวอักษรมาด้วย
+
+    frames = ผลของ frames_of(cells) · labels = cell -> ตัวอักษร
+    คืน set ของ ((บน, rt, dn), (ซ้าย, rt, dn), (ขวา, rt, dn)) ครบทั้ง 24 มุม
+
+    ส่งค่าที่ได้เข้า draw.iso(labels=...) ได้ตรง ๆ ตัวอักษรจะตะแคงตามที่ลูกบาศก์หมุนมาจริง
+    ถ้าใช้ triples() แทน ตัวอักษรจะตั้งตรงเสมอ แล้วภาพจะขัดกันเอง
+    """
+    base = {n: (labels[c], rt, dn) for c, (n, rt, dn) in frames.items()}
+    out = set()
+    for R in ROTS:
+        f = {MIR(R(n)): (lab, MIR(R(rt)), MIR(R(dn))) for n, (lab, rt, dn) in base.items()}
+        out.add((f[UP], f[BK], f[RT]))
+    return out
+
+
+def spin(face, k=1):
+    """หมุนตัวอักษรในระนาบของหน้าตัวเอง k ครั้ง ครั้งละ 90 องศา
+
+    ใช้สร้างตัวลวงแบบ "หน้าถูกหมดแต่ตัวอักษรตะแคงผิด" ซึ่งเป็นตัวลวงที่ยากที่สุด
+    """
+    lab, rt, dn = face
+    for _ in range(k % 4):
+        rt, dn = dn, NEG(rt)
+    return (lab, rt, dn)
+
+
+def faces_of(view):
+    """ดึงเฉพาะตัวอักษรออกจากมุมมองแบบมีทิศ — ใช้ตอนเทียบว่าหน้าไหนโผล่พร้อมกัน"""
+    return tuple(f[0] for f in view)
+
+
 def label_dirs(cells, labels):
     """cells + labels(cell->ตัวอักษร)  ->  dict ทิศ -> ตัวอักษร"""
     d = fold(cells)

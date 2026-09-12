@@ -468,12 +468,19 @@ def matchings(items):
                 yield [(a, items[i])] + rest
 
 def unique_views(lab, seed):
+    """สามมุมมองที่พอจะฟันธงได้ว่าหน้าไหนอยู่ตรงข้ามหน้าไหน มีทางเดียว
+
+    ใช้ oriented() ไม่ใช่ triples() เพราะภาพต้องพกทิศการตะแคงของตัวอักษรมาด้วย
+    ไม่งั้นสองภาพที่หน้าเดียวกันอยู่ตำแหน่งเดียวกันจะดูเหมือนกันเป๊ะ
+    ทั้งที่ลูกบาศก์ถูกหมุนไปคนละมุม ซึ่งเป็นภาพที่เป็นไปไม่ได้
+    """
     rng = random.Random(seed)
-    good = sorted(triples(lab)); letters = sorted(lab.values())
+    good = sorted(oriented(lab)); letters = sorted(lab.values())
     for _ in range(600):
         vs = rng.sample(good, 3)
+        seen3 = [tuple(f[0] for f in v) for v in vs]
         ok = [m for m in matchings(letters)
-              if all(not any(x in v and y in v for v in vs) for (x, y) in m)]
+              if all(not any(x in v and y in v for v in seen3) for (x, y) in m)]
         if len(ok) == 1: return vs
     raise RuntimeError
 
@@ -483,7 +490,7 @@ DICE = [({"A":"1","B":"2","C":"3","D":"4","E":"5","F":"6"}, "opp"),
 for qi, (lab, mode) in enumerate(DICE, 1):
     vs = unique_views(lab, 900 + qi + SEED * 104729)
     letters = sorted(lab.values())
-    files = [D.iso([(0,0,0)], f"dc{qi}v{j}", cell=34, ch=29, labels=v) for j, v in enumerate(vs)]
+    files = [D.iso([(0,0,0)], f"dc{qi}v{j}", cell=40, ch=34, labels=v) for j, v in enumerate(vs)]
     stem = D.compose(files, f"dc{qi}stem", seps=["",""], gap=30,
                      capt=["ภาพที่ 1","ภาพที่ 2","ภาพที่ 3"])
     if mode == "opp":

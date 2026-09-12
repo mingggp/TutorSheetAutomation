@@ -45,7 +45,14 @@ const PLAN={
 }[MIX];
 if(!PLAN){console.error('mix ต้องเป็น easy | std | hard');process.exit(1);}
 
+// แต่ละพาร์ทตั้งสัดส่วนดาวของตัวเองได้ ถ้าไม่ตั้งก็ใช้ค่ากลางของระดับชีท
+// มีไว้เพราะติวเตอร์ให้คะแนนความยากแยกพาร์ท และอยากดันเฉพาะพาร์ทมิติ
+const partWeave = part => {
+  const p = SUB.parts.find(x => x.key === part);
+  return (p && p.weave && p.weave[MIX]) || PLAN.weave;
+};
 function pickPart(part,quota){
+  const weave = partWeave(part);
   let idx=BANK.map((q,i)=>({q,i})).filter(o=>o.q.part===part);
   // --set ต้องเปลี่ยน *ตัวโจทย์* ไม่ใช่แค่ป้ายชื่อชุด ไม่งั้นชีทสัปดาห์หน้าจะซ้ำของเดิม
   //
@@ -78,8 +85,8 @@ function pickPart(part,quota){
   // ทำให้ชีทได้สัดส่วนดาวตามที่ตั้งใจจริง ไม่ใช่เก็บระดับแรกจนหมดก่อน
   for(let cap=CAP; cap<=quota && out.length<quota; cap++){
     let stuck=0, k=0;
-    while(out.length<quota && stuck<PLAN.weave.length){
-      const lv=PLAN.weave[k%PLAN.weave.length]; k++;
+    while(out.length<quota && stuck<weave.length){
+      const lv=weave[k%weave.length]; k++;
       // เลือกข้อที่ทำให้ชีทกว้างที่สุดก่อน ไม่ใช่ข้อแรกที่เจอในคลัง
       let best=null, bkey=null, pos=0;
       for(const o of idx){
