@@ -354,16 +354,24 @@ GENS = [q_buoy, q_pressure, q_hydraulic, q_continuity, q_hooke, q_work, q_power,
         q_cap, q_charge, q_projectile, q_freefall, q_shm, q_photo]
 
 
-def build(add, part, rng):
-    """เติมโจทย์คำนวณเข้าคลัง — เรียกจาก gen.py"""
+def build(add, part, rng, per=2):
+    """เติมโจทย์คำนวณเข้าคลัง แนวละ per ข้อ — เรียกจาก gen.py
+
+    เดิมหยุดที่ข้อแรกของทุกแนว คลังจึงมีแนวละข้อเดียว ชีทชุดใหม่หมุนหาข้ออื่นไม่ได้
+    """
     want = 0
     for g in GENS:
-        for _ in range(40):
+        made, seen = 0, set()
+        for _ in range(40 * per):
             r = g(rng, want)
-            if r:
-                add(part, r["arche"], r["stem"], r["choices"], r["ansIdx"],
-                    lvl=r["lvl"], why=r["why"])
-                want = (want + 2) % 5
+            if not r or r["stem"] in seen:
+                continue
+            seen.add(r["stem"])
+            add(part, r["arche"], r["stem"], r["choices"], r["ansIdx"],
+                lvl=r["lvl"], why=r["why"])
+            want = (want + 2) % 5
+            made += 1
+            if made >= per:
                 break
 
 

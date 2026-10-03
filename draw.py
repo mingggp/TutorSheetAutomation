@@ -930,7 +930,8 @@ def _tickstep(vals, lo=4, hi=12):
     return max(fit) if fit else 1
 
 
-def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=True):
+def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=True,
+            fill=True, z=1.0):
     """กราฟความเร็ว-เวลาแบบเส้นตรงต่อกัน — pts = [(t, v), ...] เรียงตามเวลา
 
     พื้นที่ใต้กราฟคือระยะทาง ความชันคือความเร่ง เด็กอ่านค่าจากขีดบนแกนได้ตรง ๆ
@@ -964,14 +965,16 @@ def vtgraph(pts, name, w=250, h=130, pad=16, xlab="t (s)", ylab="v (m/s)", grid=
         d.line([X(0) - 4 * S, Y(v), X(0), Y(v)], fill=INK, width=lw)
         s = str(v)
         d.text((X(0) - 7 * S - d.textlength(s, font=fs), Y(v) - 6 * S), s, font=fs, fill=INK)
-    d.text((X(mt) - d.textlength(xlab, font=fl) / 2, Y(0) + 18 * S), xlab, font=fl, fill=INK)
+    xw = d.textlength(xlab, font=fl)          # ชิดขวาไม่ให้เลยขอบรูป (เคยถูกตัดเป็น "t (นาที")
+    d.text((min(X(mt) - xw / 2, (W - 2) * S - xw), Y(0) + 18 * S), xlab, font=fl, fill=INK)
     d.text((X(0) + 5 * S, (pad - 11) * S), ylab, font=fl, fill=INK)
     xy = [(X(t), Y(v)) for t, v in pts]
-    d.polygon([(X(0), Y(0))] + xy + [(xy[-1][0], Y(0))], fill=(238, 247, 247))
+    if fill:                                  # ระบายเฉพาะกราฟที่พื้นที่ใต้กราฟมีความหมาย
+        d.polygon([(X(0), Y(0))] + xy + [(xy[-1][0], Y(0))], fill=(238, 247, 247))
     d.line(xy, fill=(0, 160, 160), width=max(2, S))
     for p in xy:
         d.ellipse([p[0] - 2 * S, p[1] - 2 * S, p[0] + 2 * S, p[1] + 2 * S], fill=(0, 140, 140))
-    return _save(im, W, H, name)
+    return _save(im, int(W * z), int(H * z), name)
 
 
 def _ohm(d, x, y, h, lw):
@@ -1452,3 +1455,463 @@ def views(plates, name, labels=("ด้านหน้า", "ด้านข้�
 
 def _tl(f, t):
     return ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(t, font=f)
+
+
+# ================================================================ วีคฟิสิกส์ ชุดที่ 2 — รูปของแนวใหม่
+PZ = 1.35      # ขยายตอนบันทึก ให้ตัวหนังสือในรูปไม่เล็กกว่าตัวโจทย์มากเกินไป
+
+
+def _psave(im, W, H, name):
+    return _save(im, int(W * PZ), int(H * PZ), name)
+
+
+# ทุกตัวรับพิกัดเป็นหน่วยจุด แล้วคูณ S ตอนวาด เหมือนตัววาดอื่นในไฟล์นี้
+# ตัวอักษรใช้ฟอนต์ Sarabun เท่านั้น ห้ามใส่ → Ω √ (ฟอนต์ไม่มี ต้องวาดเป็นรูป)
+
+def _arr(d, x1, y1, x2, y2, lw, head=7, fill=None):
+    """ลูกศรเส้นตรงจาก (x1,y1) ไป (x2,y2) หน่วยเป็นพิกเซลจริงแล้ว (คูณ S มาแล้ว)"""
+    fill = fill or INK
+    d.line([x1, y1, x2, y2], fill=fill, width=lw)
+    L = math.hypot(x2 - x1, y2 - y1) or 1
+    ux, uy = (x2 - x1) / L, (y2 - y1) / L
+    h = head * S
+    d.polygon([(x2, y2), (x2 - ux * h - uy * h * .55, y2 - uy * h + ux * h * .55),
+               (x2 - ux * h + uy * h * .55, y2 - uy * h - ux * h * .55)], fill=fill)
+
+
+def _ctext(d, cx, cy, t, f, fill=None):
+    """เขียนข้อความให้กึ่งกลางอยู่ที่ (cx, cy) หน่วยพิกเซลจริง"""
+    tw = d.textlength(t, font=f)
+    d.text((cx - tw / 2, cy - f.size * .62), t, font=f, fill=fill or INK)
+
+
+def _spinarrow(d, cx, cy, r, cw, lw):
+    """ลูกศรโค้งบอกทิศหมุน วางเหนือวงล้อ"""
+    box = [cx - r, cy - r, cx + r, cy + r]
+    a0, a1 = 215, 325
+    d.arc(box, a0, a1, fill=INK, width=lw)
+    ang = math.radians(a1 if cw else a0)
+    ex, ey = cx + r * math.cos(ang), cy + r * math.sin(ang)
+    tx, ty = -math.sin(ang), math.cos(ang)          # ทิศสัมผัสตามเข็ม
+    if not cw:
+        tx, ty = -tx, -ty
+    h = 7 * S
+    d.polygon([(ex + tx * h, ey + ty * h),
+               (ex - ty * h * .6, ey + tx * h * .6),
+               (ex + ty * h * .6, ey - tx * h * .6)], fill=INK)
+
+
+def belts(wheels, links, name, drive=None, ask=None, unit=1.0, pad=16):
+    """ล้อกับสายพาน — ทุกล้ออยู่บนเส้นระดับเดียวกัน
+
+    wheels = [(x, r, ri, ป้าย)]  ri = รัศมีล้อในที่ติดเพลาเดียวกัน (None ถ้าไม่มี)
+    links  = [(i, ใช้ล้อใน_i, j, ใช้ล้อใน_j, ไขว้)] ไขว้ = True คือสายพานไขว้เป็นเลขแปด
+    drive  = (i, True ถ้าตามเข็ม) วาดลูกศรโค้งบอกทิศหมุนบนล้อนั้น
+    ask    = i ล้อที่โจทย์ถาม วาดเครื่องหมายคำถามไว้เหนือล้อ
+    """
+    R = max(w[1] for w in wheels)
+    xmax = max(w[0] + w[1] for w in wheels)
+    W = int(xmax + pad * 2)
+    H = int(R * 2 + pad * 2 + 52)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    cy = (pad + 26 + R) * S
+    cx = [(pad + w[0]) * S for w in wheels]
+    f = font(14, True)
+    for k, (x, r, ri, lab) in enumerate(wheels):
+        X = cx[k]
+        d.ellipse([X - r * S, cy - r * S, X + r * S, cy + r * S], fill=TOPF, outline=INK, width=lw)
+        if ri:
+            d.ellipse([X - ri * S, cy - ri * S, X + ri * S, cy + ri * S],
+                      fill=LEFTF, outline=INK, width=lw)
+        d.ellipse([X - 3 * S, cy - 3 * S, X + 3 * S, cy + 3 * S], fill=INK)
+        _ctext(d, X, cy + (r + 13) * S, lab, f)
+    # สายพานวาดทีหลังล้อ ไม่งั้นล้อนอกทับเส้นที่คล้องล้อใน แล้วดูเหมือนคล้องล้อนอก
+    for (i, ii, j, jj, crossed) in links:
+        r1 = (wheels[i][2] if ii else wheels[i][1]) * S
+        r2 = (wheels[j][2] if jj else wheels[j][1]) * S
+        x1, x2 = cx[i], cx[j]
+        if x1 > x2:
+            x1, x2, r1, r2 = x2, x1, r2, r1
+        dd = x2 - x1
+        if not crossed:
+            t = math.asin((r1 - r2) / dd)
+            for sg in (-1, 1):
+                d.line([x1 + r1 * math.sin(t), cy + sg * r1 * math.cos(t),
+                        x2 + r2 * math.sin(t), cy + sg * r2 * math.cos(t)], fill=INK, width=lw)
+        else:
+            t = math.asin((r1 + r2) / dd)
+            for sg in (-1, 1):
+                d.line([x1 + r1 * math.sin(t), cy + sg * r1 * math.cos(t),
+                        x2 - r2 * math.sin(t), cy - sg * r2 * math.cos(t)], fill=INK, width=lw)
+    if drive:
+        k, cw = drive
+        _spinarrow(d, cx[k], cy, (wheels[k][1] + 9) * S, cw, lw)
+    if ask is not None:
+        _ctext(d, cx[ask], cy - (wheels[ask][1] + 14) * S, "?", font(16, True))
+    return _psave(im, W, H, name)
+
+
+def train(labels, name, link, force="F", bw=40, gap=26, pad=14):
+    """มวลหลายก้อนผูกเชือกเรียงกันบนพื้น ถูกดึงด้วยแรงทางขวา
+    link = ดัชนีของเชือกที่ถาม (เชือกเส้นที่ k อยู่ระหว่างก้อน k กับ k+1) วาดป้าย T กำกับ"""
+    n = len(labels)
+    W = pad * 2 + n * bw + (n - 1) * gap + 70
+    H = pad * 2 + 70
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    yg = (pad + 56) * S
+    d.line([pad * S, yg, (W - pad) * S, yg], fill=INK, width=lw)
+    for k in range(0, W - pad * 2, 9):
+        d.line([(pad + k) * S, yg, (pad + k - 6) * S, yg + 6 * S], fill=LINEG, width=lw)
+    f = font(14, True)
+    x = pad
+    for k, lab in enumerate(labels):
+        d.rectangle([x * S, yg - 32 * S, (x + bw) * S, yg], fill=TOPF, outline=INK, width=lw)
+        _ctext(d, (x + bw / 2) * S, yg - 15 * S, lab, f)
+        if k < n - 1:
+            ya = yg - 16 * S
+            d.line([(x + bw) * S, ya, (x + bw + gap) * S, ya], fill=INK, width=lw)
+            if k == link:
+                _ctext(d, (x + bw + gap / 2) * S, ya - 12 * S, "T", font(13, True))
+        x += bw + gap
+    xr = x - gap
+    _arr(d, xr * S, yg - 16 * S, (xr + 52) * S, yg - 16 * S, lw)
+    _ctext(d, (xr + 30) * S, yg - 30 * S, force, font(13, True))
+    return _psave(im, W, H, name)
+
+
+def supported(span, loads, name, unit=26, pad=18, wq=None):
+    """สะพาน / คานวางบนจุดรองรับสองจุด A (หมุด) กับ B (ลูกกลิ้ง) ที่ปลายทั้งสอง
+    loads = [(ตำแหน่งจาก A เป็นเมตร, ป้าย)] วาดเป็นลูกศรชี้ลง
+    wq = ป้ายน้ำหนักคาน ถ้ามี วาดลูกศรน้ำหนักที่กึ่งกลางเป็นเส้นประ
+    มีเส้นบอกระยะระหว่างทุกจุดสำคัญ เพราะโจทย์นี้ต้องคำนวณจากระยะจริง"""
+    W = int(span * unit + pad * 2 + 20)
+    H = pad * 2 + 120
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    x0 = (pad + 10) * S
+    X = lambda m: x0 + m * unit * S
+    yb = (pad + 50) * S
+    d.rectangle([X(0), yb, X(span), yb + 8 * S], fill=TOPF, outline=INK, width=lw)
+    d.polygon([(X(0), yb + 8 * S), (X(0) - 10 * S, yb + 26 * S), (X(0) + 10 * S, yb + 26 * S)],
+              fill=LEFTF, outline=INK)
+    d.ellipse([X(span) - 9 * S, yb + 8 * S, X(span) + 9 * S, yb + 26 * S],
+              fill=LEFTF, outline=INK, width=lw)
+    d.line([X(0) - 18 * S, yb + 27 * S, X(span) + 18 * S, yb + 27 * S], fill=INK, width=lw)
+    f = font(13, True)
+    _ctext(d, X(0) - 16 * S, yb - 8 * S, "A", f)
+    _ctext(d, X(span) + 16 * S, yb - 8 * S, "B", f)
+    marks = sorted({0, span} | {p for p, _ in loads})
+    for p, lab in loads:
+        _arr(d, X(p), yb - 38 * S, X(p), yb - 1 * S, lw)
+        _ctext(d, X(p), yb - 46 * S, lab, f)
+    if wq:
+        xm = X(span / 2)
+        for k in range(4):
+            d.line([xm, yb + 8 * S + k * 10 * S, xm, yb + 8 * S + k * 10 * S + 5 * S],
+                   fill=LINEG, width=lw)
+    yd = yb + 44 * S
+    fd = font(12, False)
+    for a, b in zip(marks, marks[1:]):
+        d.line([X(a), yd, X(b), yd], fill=INK, width=lw)
+        for xe in (X(a), X(b)):
+            d.line([xe, yd - 5 * S, xe, yd + 5 * S], fill=INK, width=lw)
+        _ctext(d, (X(a) + X(b)) / 2, yd + 13 * S, f"{b - a:g} m", fd)
+    return _psave(im, W, H, name)
+
+
+def ring3(dirs, angles, name, labels=("A", "B", "C"), L=70, pad=16):
+    """เชือกสามเส้นผูกที่ห่วงกลาง — dirs = ทิศของเชือกแต่ละเส้นเป็นองศา (0 = ขวา, 90 = ขึ้น)
+    angles = [(เส้น i, เส้น j, ข้อความมุม)] เขียนมุมระหว่างเส้นไว้ใกล้ห่วง
+    เส้นที่ชี้ลงจะผูกก้อนน้ำหนัก ส่วนเส้นอื่นยึดผนังหรือเพดาน"""
+    W = H = int(L * 2 + pad * 2 + 40)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    cx, cy = W / 2 * S, (H / 2 - 6) * S
+    f = font(13, True)
+    for k, a in enumerate(dirs):
+        r = math.radians(a)
+        ex, ey = cx + L * S * math.cos(r), cy - L * S * math.sin(r)
+        d.line([cx, cy, ex, ey], fill=INK, width=lw)
+        if math.sin(r) < -0.9:
+            d.rectangle([ex - 16 * S, ey, ex + 16 * S, ey + 24 * S], fill=LEFTF, outline=INK, width=lw)
+        else:
+            nx, ny = -math.sin(r), -math.cos(r)
+            d.line([ex + nx * 14 * S, ey + ny * 14 * S, ex - nx * 14 * S, ey - ny * 14 * S],
+                   fill=INK, width=3 * lw)
+        lx, ly = cx + L * .62 * S * math.cos(r), cy - L * .62 * S * math.sin(r)
+        nx, ny = math.sin(r), math.cos(r)
+        _ctext(d, lx + nx * 11 * S, ly + ny * 11 * S, labels[k], f)
+    d.ellipse([cx - 7 * S, cy - 7 * S, cx + 7 * S, cy + 7 * S], fill="white", outline=INK, width=lw)
+    fa = font(12, False)
+    for i, j, txt in angles:
+        a1, a2 = dirs[i], dirs[j]
+        diff = (a2 - a1) % 360
+        mid = a1 + diff / 2 if diff <= 180 else a2 + (360 - diff) / 2
+        r = math.radians(mid)
+        _ctext(d, cx + 26 * S * math.cos(r), cy - 26 * S * math.sin(r) + 3 * S, txt, fa)
+    return _psave(im, W, H, name)
+
+
+def tanks(wa, wb, ha, hb, name, unit=4, pad=16, depth=None):
+    """ถังสองใบต่อกันด้วยท่อที่ก้นและมีวาล์วปิดอยู่ — wa wb = ความกว้าง (เทียบพื้นที่หน้าตัด)
+    ha hb = ระดับน้ำเป็นเซนติเมตร วาดเส้นบอกระดับกำกับตัวเลขไว้"""
+    top = max(ha, hb) + 12
+    depth = depth or top
+    W = int((wa + wb) * unit + 120 + pad * 2)
+    H = int(depth * unit + pad * 2 + 46)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    yb = (pad + 10 + depth * unit) * S
+    f = font(13, True)
+    fd = font(12, False)
+    xa = (pad + 30) * S
+    xb = xa + (wa * unit + 70) * S
+    for x, w, h, lab in ((xa, wa, ha, "A"), (xb, wb, hb, "B")):
+        x2 = x + w * unit * S
+        d.rectangle([x, yb - h * unit * S, x2, yb], fill=TOPF)
+        d.line([x, yb - depth * unit * S, x, yb, x2, yb, x2, yb - depth * unit * S],
+               fill=INK, width=2 * lw)
+        _ctext(d, (x + x2) / 2, yb - h * unit * S / 2, lab, f)
+        xm = x - 14 * S
+        d.line([xm, yb - h * unit * S, xm, yb], fill=INK, width=lw)
+        for yy in (yb - h * unit * S, yb):
+            d.line([xm - 4 * S, yy, xm + 4 * S, yy], fill=INK, width=lw)
+        _ctext(d, xm - 2 * S, yb - h * unit * S - 9 * S, f"{h} cm", fd)
+    ax2 = xa + wa * unit * S
+    yp = yb + 10 * S
+    d.line([ax2 - 8 * S, yb, ax2 - 8 * S, yp, xb + 8 * S, yp, xb + 8 * S, yb], fill=INK, width=2 * lw)
+    vx = (ax2 + xb) / 2
+    d.ellipse([vx - 8 * S, yp - 8 * S, vx + 8 * S, yp + 8 * S], fill="white", outline=INK, width=lw)
+    d.line([vx - 5 * S, yp - 5 * S, vx + 5 * S, yp + 5 * S], fill=INK, width=lw)
+    d.line([vx - 5 * S, yp + 5 * S, vx + 5 * S, yp - 5 * S], fill=INK, width=lw)
+    _ctext(d, vx, yp + 20 * S, "วาล์ว", fd)
+    return _psave(im, W, H, name)
+
+
+VESSELS = {
+    "cyl":     lambda y: .62,
+    "cone_up": lambda y: .25 + .75 * y,            # ก้นแคบ ปากกว้าง
+    "cone_dn": lambda y: 1 - .75 * y,              # ก้นกว้าง ปากแคบ
+    "bulb":    lambda y: .35 + .65 * math.sin(math.pi * y),
+    "waist":   lambda y: 1 - .65 * math.sin(math.pi * y),
+    "step_dn": lambda y: 1.0 if y < .5 else .4,     # ล่างกว้าง บนแคบ
+    "step_up": lambda y: .4 if y < .5 else 1.0,     # ล่างแคบ บนกว้าง
+}
+
+
+def vessel(kind, name, w=110, h=120, pad=14, tap=True):
+    """ภาชนะสมมาตร หน้าตัดกลม ความกว้างตามฟังก์ชันใน VESSELS มีก๊อกเติมน้ำด้านบน"""
+    fn = VESSELS[kind]
+    W, H = w + pad * 2, h + pad * 2 + 30
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    cx = W / 2 * S
+    yb = (pad + 30 + h) * S
+    pts = []
+    for k in range(61):
+        y = k / 60
+        pts.append((cx + fn(y) * w / 2 * S, yb - y * h * S))
+    left = [(2 * cx - x, y) for x, y in pts]
+    d.polygon(pts + left[::-1], fill="white")
+    d.line(left[::-1] + [(left[0][0], yb), (pts[0][0], yb)] + pts, fill=INK, width=2 * lw)
+    if tap:                                  # ภาชนะในตัวเลือกไม่ต้องมีป้าย จะได้ไม่รก
+        _arr(d, cx, (pad + 2) * S, cx, (pad + 24) * S, lw)
+        _ctext(d, cx + 30 * S, (pad + 10) * S, "เติมน้ำ", font(12, False))
+    return _psave(im, W, H, name)
+
+
+def vessel_time(kind, n=200):
+    """เวลาที่ใช้เติมจนถึงความสูง y (0..1) เมื่อเติมน้ำด้วยอัตราคงที่ — ปริมาตรสะสมของหน้าตัดกลม"""
+    fn = VESSELS[kind]
+    ts, acc = [0.0], 0.0
+    for k in range(n):
+        y = (k + .5) / n
+        acc += fn(y) ** 2 / n
+        ts.append(acc)
+    return [t / acc for t in ts]          # ปรับให้เต็มที่เวลา 1
+
+
+def hgraph(kind, name, w=96, h=72, pad=12):
+    """กราฟความสูงของระดับน้ำ (แกนตั้ง) กับเวลา (แกนนอน) ไม่มีตัวเลข อ่านจากรูปร่างกราฟ"""
+    ts = vessel_time(kind)
+    W, H = w + pad * 2 + 10, h + pad * 2 + 10
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    ox, oy = (pad + 10) * S, (pad + h) * S
+    _arr(d, ox, oy, ox, (pad - 4) * S, lw, head=5)
+    _arr(d, ox, oy, (pad + 10 + w + 4) * S, oy, lw, head=5)
+    fa = font(11, True)
+    d.text(((pad - 2) * S, (pad - 8) * S), "h", font=fa, fill=INK)
+    d.text(((pad + w + 4) * S, oy + 2 * S), "t", font=fa, fill=INK)
+    n = len(ts) - 1
+    pts = [(ox + ts[k] * w * S, oy - k / n * h * S) for k in range(n + 1)]
+    d.line(pts, fill=INK, width=2 * lw)
+    return _psave(im, W, H, name)
+
+
+def ramp(n, name, stop, unit=24, pad=16, rise=.5):
+    """พื้นเอียง มีจุดห่างเท่ากัน A B C ... ลูกบอลเริ่มที่จุดล่างสุด และหยุดที่จุด stop"""
+    W = int(n * unit + pad * 2 + 30)
+    H = int(n * unit * rise + pad * 2 + 40)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    x0, y0 = (pad + 10) * S, (H - pad - 10) * S
+    x1, y1 = x0 + n * unit * S, y0 - n * unit * rise * S
+    d.polygon([(x0, y0), (x1, y0), (x1, y1)], fill=TOPF, outline=INK)
+    f = font(12, True)
+    L = math.hypot(x1 - x0, y1 - y0)
+    nx, ny = -(y1 - y0) / L, (x1 - x0) / L        # ตั้งฉากชี้ขึ้นซ้าย
+    for k in range(n + 1):
+        px, py = x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n
+        d.ellipse([px - 2 * S, py - 2 * S, px + 2 * S, py + 2 * S], fill=INK)
+        _ctext(d, px + 4 * S, py + 13 * S, AZLAB[k], f)      # ใต้แนวพื้นเอียง ไม่ให้ลูกบอลบัง
+    d.ellipse([x0 - 7 * S, y0 - 15 * S, x0 + 7 * S, y0 - 1 * S], fill=INK)
+    return _psave(im, W, H, name)
+
+
+AZLAB = "ABCDEFGHIJKLMNOP"
+
+
+def utube(h_oil, h_water, name, unit=3, pad=16):
+    """หลอดตัวยูบรรจุน้ำ แล้วเทของเหลวที่ไม่ผสมกับน้ำลงแขนซ้าย
+    h_oil = ความสูงของของเหลวเหนือรอยต่อ · h_water = ความสูงของน้ำแขนขวาเหนือระดับรอยต่อ
+    ลากเส้นประที่ระดับรอยต่อข้ามทั้งสองแขน แล้วกำกับความสูงเป็นเซนติเมตร"""
+    top = max(h_oil, h_water) + 14
+    arm, gap = 22, 46
+    W = pad * 2 + arm * 2 + gap + 110
+    H = int(pad * 2 + (top + 40) * unit + 30)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    xl = (pad + 50) * S
+    xr = xl + (arm + gap) * S
+    yb = (H - pad - 10) * S
+    yi = yb - 30 * unit * S                      # ระดับรอยต่อ
+    # น้ำ: เต็มก้น + แขนซ้ายถึงรอยต่อ + แขนขวาถึง yi - h_water
+    d.rectangle([xl, yi, xr + arm * S, yb], fill=TOPF)
+    d.rectangle([xl + arm * S, yi, xr, yb - 18 * S], fill="white")
+    d.rectangle([xr, yi - h_water * unit * S, xr + arm * S, yi], fill=TOPF)
+    d.rectangle([xl, yi - h_oil * unit * S, xl + arm * S, yi], fill=(205, 205, 205))
+    ytop = yi - top * unit * S
+    d.line([xl, ytop, xl, yb, xr + arm * S, yb, xr + arm * S, ytop], fill=INK, width=2 * lw)
+    d.line([xl + arm * S, ytop, xl + arm * S, yb - 18 * S, xr, yb - 18 * S, xr, ytop],
+           fill=INK, width=2 * lw)
+    for x in range(int(xl - 20 * S), int(xr + (arm + 20) * S), int(8 * S)):
+        d.line([x, yi, x + 4 * S, yi], fill=INK, width=lw)
+    fd = font(12, False)
+    for x, h, side in ((xl, h_oil, -1), (xr + arm * S, h_water, 1)):
+        xm = x + side * 14 * S
+        d.line([xm, yi - h * unit * S, xm, yi], fill=INK, width=lw)
+        for yy in (yi - h * unit * S, yi):
+            d.line([xm - 4 * S, yy, xm + 4 * S, yy], fill=INK, width=lw)
+        _ctext(d, xm + side * 22 * S, yi - h * unit * S / 2, f"{h} cm", fd)
+    f = font(12, True)
+    _ctext(d, xl + arm * S / 2, yi - h_oil * unit * S - 10 * S, "X", f)
+    _ctext(d, xr + arm * S / 2, yi - h_water * unit * S - 10 * S, "น้ำ", fd)
+    return _psave(im, W, H, name)
+
+
+def floaters(blocks, name, bw=34, unit=12, pad=16):
+    """ก้อนไม้ลอยน้ำหลายก้อน — blocks = [(ป้าย, ส่วนที่จม, จำนวนส่วนทั้งหมด)]
+    แต่ละก้อนตีเส้นแบ่งเป็นชั้นเท่า ๆ กัน นับได้ว่าจมไปกี่ส่วน"""
+    hmax = max(q for _, _, q in blocks)
+    W = pad * 2 + len(blocks) * (bw + 30) + 20
+    H = pad * 2 + hmax * unit + 60
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    ys = (pad + 20 + hmax * unit * .55) * S         # ผิวน้ำ
+    yb = (H - pad) * S
+    d.rectangle([pad * S, ys, (W - pad) * S, yb], fill=TOPF)
+    d.line([pad * S, ys - 60 * S, pad * S, yb, (W - pad) * S, yb, (W - pad) * S, ys - 60 * S],
+           fill=INK, width=2 * lw)
+    f = font(13, True)
+    x = pad + 25
+    for lab, p, q in blocks:
+        ybot = ys + p * unit * S
+        ytop = ybot - q * unit * S
+        d.rectangle([x * S, ytop, (x + bw) * S, ybot], fill=(232, 222, 200), outline=INK, width=lw)
+        for k in range(1, q):
+            yy = ybot - k * unit * S
+            d.line([x * S, yy, (x + bw) * S, yy], fill=LINEG, width=lw)
+        _ctext(d, (x + bw / 2) * S, ytop - 10 * S, lab, f)
+        x += bw + 30
+    d.line([pad * S, ys, (W - pad) * S, ys], fill=INK, width=lw)
+    return _psave(im, W, H, name)
+
+
+def taper(radii, name, seg=60, pad=16, labels=None):
+    """ท่อแนวนอนที่หน้าตัดเปลี่ยนไป — radii = รัศมีที่จุดควบคุมห่างกันจุดละ seg
+    ติดป้ายจุด A B C ... ที่จุดควบคุมแต่ละจุดบนแกนกลางท่อ และมีลูกศรบอกทิศการไหล"""
+    labels = labels or AZLAB[:len(radii)]
+    n = len(radii)
+    R = max(radii)
+    W = int(seg * (n - 1) + pad * 2 + 60)
+    H = int(R * 2 + pad * 2 + 30)
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    cy = (H / 2 + 8) * S
+    x0 = (pad + 30) * S
+    xs = [x0 - 24 * S] + [x0 + k * seg * S for k in range(n)] + [x0 + ((n - 1) * seg + 24) * S]
+    rs = [radii[0]] + list(radii) + [radii[-1]]
+    top = [(x, cy - r * S) for x, r in zip(xs, rs)]
+    bot = [(x, cy + r * S) for x, r in zip(xs, rs)]
+    d.polygon(top + bot[::-1], fill=TOPF)
+    d.line(top, fill=INK, width=2 * lw)
+    d.line(bot, fill=INK, width=2 * lw)
+    for k in range(0, int(xs[-1] - xs[0]), int(9 * S)):
+        d.line([xs[0] + k, cy, xs[0] + k + 4 * S, cy], fill=LINEG, width=lw)
+    f = font(13, True)
+    for k in range(n):
+        x = x0 + k * seg * S
+        d.ellipse([x - 3 * S, cy - 3 * S, x + 3 * S, cy + 3 * S], fill=INK)
+        _ctext(d, x, cy - (radii[k] + 11) * S, labels[k], f)    # เหนือขอบท่อ ไม่ทับจุด
+    _arr(d, xs[0] - 22 * S, cy, xs[0] + 2 * S, cy, lw)
+    return _psave(im, W, H, name)
+
+
+def wave(amp, lam, nlam, name, ux=26, uy=14, pad=18, xunit="m", yunit="cm"):
+    """คลื่นรูปไซน์บนตาราง — แกนนอนเป็นระยะ (ช่องละ lam/4) แกนตั้งเป็นการกระจัด (ช่องละ amp/2)
+    พิมพ์ตัวเลขทุกช่องบนแกน เพื่อให้อ่านความยาวคลื่นและแอมพลิจูดจากรูปได้เอง"""
+    cols = int(nlam * 4)
+    W = cols * ux + pad * 2 + 46
+    H = 4 * uy * 2 + pad * 2 + 30
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    ox, oy = (pad + 34) * S, (pad + 4 * uy) * S
+    for c in range(cols + 1):
+        d.line([ox + c * ux * S, oy - 4 * uy * S, ox + c * ux * S, oy + 4 * uy * S], fill=_HAIR, width=_HW)
+    for r in range(-4, 5):
+        d.line([ox, oy + r * uy * S, ox + cols * ux * S, oy + r * uy * S], fill=_HAIR, width=_HW)
+    d.line([ox, oy, ox + cols * ux * S, oy], fill=INK, width=lw)
+    d.line([ox, oy - 4 * uy * S, ox, oy + 4 * uy * S], fill=INK, width=lw)
+    fd = font(11, False)
+    for c in range(0, cols + 1, 2):
+        v = lam / 4 * c
+        _ctext(d, ox + c * ux * S, oy + 4 * uy * S + 12 * S, f"{v:g}", fd)
+    for r in (-4, -2, 2, 4):
+        v = amp * (-r) / 2                       # หนึ่งช่องตั้ง = ครึ่งแอมพลิจูด
+        tw = d.textlength(f"{v:g}", font=fd)
+        d.text((ox - tw - 4 * S, oy + r * uy * S - 7 * S), f"{v:g}", font=fd, fill=INK)
+    d.text((ox + cols * ux * S + 14 * S, oy - 6 * S), xunit, font=fd, fill=INK)
+    d.text((ox - 30 * S, oy - 4 * uy * S - 16 * S), yunit, font=fd, fill=INK)
+    pts = []
+    N = cols * 12
+    for k in range(N + 1):
+        x = k / N * cols
+        y = math.sin(2 * math.pi * x / 4) * 2           # 2 ช่อง = แอมพลิจูด
+        pts.append((ox + x * ux * S, oy - y * uy * S))
+    d.line(pts, fill=INK, width=2 * lw)
+    return _psave(im, W, H, name)

@@ -54,10 +54,13 @@ PULLEY_SETS = [(2, 120), (3, 120), (4, 120), (5, 120), (6, 120),
 
 
 def pulley_q(rng, want=0, n=None):
-    cand = [p for p in PULLEY_SETS if n is None or p[0] == n]
-    nn, W = rng.choice(cand)
+    # เดิมเลือกจาก PULLEY_SETS 11 คู่ ชุดใหม่จึงได้ข้อเดิมเป๊ะบ่อย ตอนนี้สุ่มน้ำหนักเป็นพหุคูณของจำนวนเส้น
+    nn = n or rng.choice([2, 3, 4, 5, 6])
+    W = nn * rng.randrange(15, 151, 5)
     truth = W // nn
-    wrong = [W // (nn - 1), W // (nn + 1), W // 2, W, W * 2 // nn if nn > 2 else W // 4]
+    # ใช้เฉพาะตัวลวงที่หารลงตัว ตัวเลขอย่าง 133 (ปัดจาก 400/3) ดูออกทันทีว่าผิด
+    cand = [(W, nn - 1), (W, nn + 1), (W, 2), (W, 1), (2 * W, nn), (W, 4), (2 * W, 1)]
+    wrong = [a // b for a, b in cand if a % b == 0] + [truth * 2, truth + truth // 2]
     o = _opts(truth, wrong, want)
     if not o:
         return None
@@ -108,12 +111,14 @@ def pulley_stack_q(rng, want=0, k=None):
     ตัวลวงตัวนั้นต้องอยู่ในตัวเลือกเสมอ ยกเว้นกรณีที่มันชนกับคำตอบพอดี
     """
     kk = k or rng.choice([2, 3])
-    for W in rng.sample([160, 240, 320, 480, 640, 960], 6):
+    for _ in range(60):
         m = 2 ** kk
-        if W % m or W % (2 * kk):
-            continue
+        # เดิมมีแค่ 6 ค่า ชุดใหม่ได้ข้อเดิมเป๊ะ · ต้องหารด้วย 2k ลงตัวด้วย ตัวลวงแบบบวกกันจะได้อยู่เสมอ
+        step = m * 2 * kk // __import__("math").gcd(m, 2 * kk)
+        W = step * rng.randrange(max(2, 80 // step), 960 // step + 1)
         truth = W // m
-        wrong = [W // (2 * kk), W // 2, W // kk if W % kk == 0 else None,
+        wrong = [W // (2 * kk) if W % (2 * kk) == 0 else None, W // 2,
+                 W // kk if W % kk == 0 else None,
                  W // (m // 2), W // (m * 2) if W % (m * 2) == 0 else None, W]
         o = _opts(truth, [w for w in wrong if w and w != truth], want)
         if not o:

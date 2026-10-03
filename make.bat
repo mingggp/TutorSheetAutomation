@@ -47,7 +47,7 @@ python gen.py
 if errorlevel 1 goto err
 
 echo [2/4] ประกอบชีทนักเรียน ...
-node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --out "%STU%.docx"
+node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --record --out "%STU%.docx"
 if errorlevel 1 goto err
 
 echo [3/4] ประกอบฉบับครู ...

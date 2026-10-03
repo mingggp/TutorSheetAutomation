@@ -21,12 +21,53 @@ const FCAP = parseInt(arg('fcap','4'),10);   // ตระกูลเดีย�
 const FAM = [['อนุกรม', /^(ลำดับ|อนุกรม|ปริศนาตัวอักษร)/],
              ['กล่องและลูกเต๋า', /^(พับกล่อง|ลูกเต๋า|รูปคลี่)/],
              ['พับกระดาษ', /^พับกระดาษ/],
-             ['เมทริกซ์', /^เมทริกซ์/]];
+             ['เมทริกซ์', /^เมทริกซ์/],
+             // โจทย์แนวคิดเขียนมือ พิสูจน์ด้วยโค้ดไม่ได้ จึงไม่ควรกินท่อนเกินสี่ข้อ
+             // ชุดที่ 1 ของวีคฟิสิกส์มีถึง 15 จาก 40 ข้อ
+             ['แนวคิด', /^แนวคิด/]];
 const famOf = a => { for(const [f,re] of FAM) if(re.test(a)) return f; return null; };
 const SUBJ= arg('subject','tpat3');
 const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf8'))[SUBJ];
 if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
 const PMETA=Object.fromEntries(SUB.parts.map(p=>[p.key,p]));
+
+// ---------- สมุดบันทึกข้อที่เคยออกไปแล้ว ----------
+// ledger.json = { วิชา: { เลขชุด: [ลายนิ้วมือ] } } · ชุดที่ N เลี่ยงข้อที่อยู่ในชุดที่น้อยกว่า N
+const crypto=require('crypto');
+const LEDGER_F=path.join(__dirname,'ledger.json');
+const LEDGER=fs.existsSync(LEDGER_F)?JSON.parse(fs.readFileSync(LEDGER_F,'utf8')):{};
+const SETNO=parseInt(SET,10)||1;
+const _ih={};
+const imgHash=f=>{
+  if(!f) return '';
+  if(_ih[f]===undefined){
+    const p=path.join(__dirname,'img',f);
+    _ih[f]=fs.existsSync(p)?crypto.createHash('sha1').update(fs.readFileSync(p)).digest('hex').slice(0,12):f;
+  }
+  return _ih[f];
+};
+const fpOf=q=>crypto.createHash('sha1')
+  .update([q.stem,[...q.choices].sort().join('|'),imgHash(q.img),imgHash(q.optimg)].join('#'))
+  .digest('hex').slice(0,16);
+// รูปแบบเดิมเก็บเป็นลิสต์ของลายนิ้วมืออย่างเดียว รูปแบบใหม่เก็บ {fp, arche}
+const _fps=v=>Array.isArray(v)?v:(v.fp||[]);
+const USED=new Set(Object.entries(LEDGER[SUBJ]||{})
+  .filter(([k])=>parseInt(k,10)<SETNO).flatMap(([,v])=>_fps(v)));
+// ลายนิ้วมือข้อความล้วน ใช้กับข้อที่ตัวเลือกเป็นข้อความเท่านั้น (ดูเหตุผลที่ isUsed)
+const tfpOf=q=>crypto.createHash('sha1').update(q.stem+'#'+[...q.choices].sort().join('|'))
+  .digest('hex').slice(0,16);
+const USED_T=new Set(Object.entries(LEDGER[SUBJ]||{})
+  .filter(([k])=>parseInt(k,10)<SETNO).flatMap(([,v])=>Array.isArray(v)?[]:(v.tfp||[])));
+const textual=q=>q.choices.some(c=>c&&c.trim());
+// ข้อที่ตัวเลือกเป็นรูป ข้อความโจทย์มักเหมือนกันทั้งแนว ต้องดูรูปด้วยเสมอ จึงใช้แค่ fp
+const isUsed=o=>{
+  if(o.fp===undefined) o.fp=fpOf(o.q);
+  if(USED.has(o.fp)) return true;
+  return textual(o.q) && USED_T.has(tfpOf(o.q));
+};
+// แนวที่ชุดก่อนหน้า (N-1) มีอยู่แล้ว — ชุดนี้หยิบแนวอื่นขึ้นก่อน
+const _prev=(LEDGER[SUBJ]||{})[String(SETNO-1)];
+const PREV_A=new Set(_prev&&!Array.isArray(_prev)?(_prev.arche||[]):[]);
 
 // ลำดับการหยิบตามระดับดาว ตัวแรกคือระดับหลักของชีท ที่เหลือคือตัวเติม
 // ชีทระดับกลางเติมด้วยข้อยากก่อนข้อง่าย เพราะข้อสอบความถนัดต้องมีข้อที่ยืดเพดานให้เด็ก
@@ -96,10 +137,29 @@ function pickPart(part,quota){
         if((n[a]||0)>=cap) continue;
         if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
         // ลำดับความสำคัญ: กระจายแนวก่อน แล้วเลี่ยงคำถามซ้ำคำ แล้วค่อยหมุนตามชุด
-        const key=[(n[a]||0), heads.has(head1(o.q))?1:0, rank[a], pos];
+        // ข้อที่เคยออกในชุดก่อนหน้าถูกเลือกทีหลังสุด แล้วค่อยดูความกว้างของแนว
+        const key=[isUsed(o)?1:0, (n[a]||0), PREV_A.has(a)?1:0,
+                   heads.has(head1(o.q))?1:0, rank[a], pos];
         if(!bkey || key.some((v,z)=>v<bkey[z] && key.slice(0,z).every((u,y)=>u===bkey[y]))){
           best=o; bkey=key;
         }
+      }
+      // วิชาที่เปิด variety: ถ้าข้อที่ดีที่สุดเป็นแนวที่หยิบไปแล้ว ลองหาแนวใหม่ที่ระดับข้างเคียงก่อน
+      if(best && SUB.variety && (n[best.q.arche]||0)>0){
+        let alt=null, akey=null, p2=0;
+        for(const o of idx){
+          p2++;
+          if(Math.abs(o.q.lvl-lv)!==1 || seen.has(o.i)) continue;
+          const a=o.q.arche, f=famOf(a);
+          if((n[a]||0)>0) continue;
+          if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
+          if(isUsed(o)) continue;
+          const k2=[-o.q.lvl, PREV_A.has(a)?1:0, rank[a], p2];
+          if(!akey || k2.some((v,z)=>v<akey[z] && k2.slice(0,z).every((u,y)=>u===akey[y]))){
+            alt=o; akey=k2;
+          }
+        }
+        if(alt) best=alt;
       }
       if(best){
         const a=best.q.arche, f=famOf(a);
@@ -118,6 +178,17 @@ function pickPart(part,quota){
 const NP=SUB.parts.length;
 const quota=SUB.parts.map((_,i)=>Math.floor(N/NP)+(i<N%NP?1:0));
 const QS=SUB.parts.flatMap((p,i)=>pickPart(p.key,quota[i]));
+// --record = จดลายนิ้วมือของชีทชุดนี้ลง ledger.json (make.bat ส่งมาตอนออกฉบับนักเรียน)
+if(argv.includes('--record')){
+  LEDGER[SUBJ]=LEDGER[SUBJ]||{};
+  LEDGER[SUBJ][String(SETNO)]={fp:QS.map(fpOf), tfp:QS.filter(textual).map(tfpOf),
+                                arche:[...new Set(QS.map(q=>q.arche))]};
+  fs.writeFileSync(LEDGER_F, JSON.stringify(LEDGER,null,1));
+}
+const nUsed=QS.filter(q=>isUsed({q})).length;
+if(USED.size) console.error(`ข้อที่เคยออกในชุดก่อนหน้า: ${nUsed} จาก ${QS.length} ข้อ`);
+const nNew=new Set(QS.map(q=>q.arche).filter(a=>!PREV_A.has(a))).size;
+if(PREV_A.size) console.error(`แนวที่ชุดก่อนหน้าไม่มี: ${nNew} แนว`);
 // --list = พิมพ์รายการข้อที่เลือกแล้วออก ใช้ตอนไล่บั๊กว่า "ข้อ 38" คือแนวไหน
 if(argv.includes('--list')){
   QS.forEach((q,i)=>console.log(String(i+1).padStart(3)+"  "+q.part+"  ลว."+q.lvl+"  "+q.arche

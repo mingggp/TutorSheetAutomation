@@ -671,6 +671,10 @@ concept.build(add, P3, P4)
 import physics
 physics.build(add, P4, random.Random(8300 + SEED * 104729))
 
+# แนวใหม่ 20 แนวของวีคฟิสิกส์ ถอดจากท่อนเชิงกล/เชิงวิทย์ของไฟล์ติวเตอร์ (3 ต.ค. 69)
+import physgen
+physgen.build(add, P3, P4, random.Random(8500 + SEED * 104729), per=3)
+
 import numeric
 numeric.build(add, P1, random.Random(6100 + SEED * 104729))
 
