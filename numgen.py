@@ -396,7 +396,7 @@ def q_paths(rng, want, tag=0):
                      "ไล่เติมจำนวนเส้นทางทีละช่องจากซ้ายบน แต่ละช่องเท่ากับช่องบนบวกช่องซ้าย",
                      {"R": R, "C": C, "holes": sorted(holes), "ans": ans},
                      draw=lambda t: D.grid(R, C, filled=sorted(holes),
-                                           name=f"pth{t}", cell=26,
+                                           name=f"pth{t}", cell=32,
                                            ends=("Start", "End")))
     return None
 

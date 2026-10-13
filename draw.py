@@ -1434,22 +1434,23 @@ def dotgrid(rows, name, cell=24, pad=9, lines=True, frame=True, fold=(), rad=.24
 
 # ---------------------------------------------------------------- ภาพฉายสามด้าน
 def views(plates, name, labels=("ด้านหน้า", "ด้านข้าง", "ด้านบน"), gap=30, labh=26):
-    """วางภาพฉายเรียงกันพร้อมป้ายชื่อใต้ภาพ — plates = ไฟล์ที่ได้จาก plate()"""
+    """วางภาพฉายเรียงกันพร้อมป้ายชื่อใต้ภาพ — plates = ไฟล์ที่บันทึกที่ขนาดแสดงจริง
+
+    เดิมหารขนาดด้วย S ทั้งที่รูปย่อยไม่ได้เก็บแบบ S เท่า รูปจึงเล็กเหลือหนึ่งในสาม
+    """
     ims = [Image.open(os.path.join(IMG, p)) for p in plates]
-    hi = [HIRES.get(p, 1) for p in plates]
-    ims = [im if h == 1 else im.resize((im.width // h, im.height // h), Image.LANCZOS)
-           for im, h in zip(ims, hi)]
     f = font(15, False)
-    wid = [max(im.width, int(_tl(f, t)) + 10 * S) for im, t in zip(ims, labels)]
-    W = (sum(wid) + gap * S * (len(ims) - 1)) // S
-    H = (max(im.height for im in ims)) // S + labh
+    wid = [max(im.width, int(_tl(f, t) / S) + 10) for im, t in zip(ims, labels)]
+    W = sum(wid) + gap * (len(ims) - 1)
+    H = max(im.height for im in ims) + labh
     out = Image.new("RGB", (W * S, H * S), "white")
     d = ImageDraw.Draw(out)
     x = 0
     for im, t, w in zip(ims, labels, wid):
-        out.paste(im, (x + (w - im.width) // 2, 0))
-        d.text((x + (w - _tl(f, t)) / 2, (H - labh + 5) * S), t, font=f, fill=INK)
-        x += w + gap * S
+        out.paste(im.resize((im.width * S, im.height * S), Image.LANCZOS),
+                  ((x + (w - im.width) // 2) * S, 0))
+        d.text(((x + w / 2) * S - _tl(f, t) / 2, (H - labh + 5) * S), t, font=f, fill=INK)
+        x += w + gap
     return _save(out, W, H, name)
 
 

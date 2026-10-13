@@ -119,6 +119,9 @@ function pickPart(part,quota){
   const out=[], seen=new Set(), n={}, g={};
   const heads=new Set();     // บรรทัดแรกของคำถามที่หยิบเข้าชีทไปแล้ว
   const head1=q=>q.stem.split(/\r?\n/)[0].trim();
+  // แม่แบบ = บรรทัดแรกที่ตัดตัวเลขทิ้ง สองข้อแม่แบบเดียวกันคือโจทย์เดิมเปลี่ยนเลข
+  const tmplOf=q=>head1(q).replace(/[0-9๐-๙.,]+/g,'#').replace(/\s+/g,' ');
+  const tmpls=new Set();
   // เก็บทีละรอบ ค่อย ๆ ผ่อนเพดานจำนวนข้อต่อแนว
   // รอบแรกจำกัดแนวละ CAP ข้อตามกติกาข้อ 5 ถ้าคลังไม่พอค่อยผ่อนทีละขั้น
   // ผลคือชีทได้หลายแนวก่อนเสมอ แทนที่จะกวาดจากหัวคลังจนแนวแรกล้น
@@ -138,18 +141,23 @@ function pickPart(part,quota){
         if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
         // ลำดับความสำคัญ: กระจายแนวก่อน แล้วเลี่ยงคำถามซ้ำคำ แล้วค่อยหมุนตามชุด
         // ข้อที่เคยออกในชุดก่อนหน้าถูกเลือกทีหลังสุด แล้วค่อยดูความกว้างของแนว
-        const key=[isUsed(o)?1:0, (n[a]||0), PREV_A.has(a)?1:0,
-                   heads.has(head1(o.q))?1:0, rank[a], pos];
+        const key=[isUsed(o)?1:0, (n[a]||0), tmpls.has(tmplOf(o.q))?1:0,
+                   PREV_A.has(a)?1:0, heads.has(head1(o.q))?1:0, rank[a], pos];
         if(!bkey || key.some((v,z)=>v<bkey[z] && key.slice(0,z).every((u,y)=>u===bkey[y]))){
           best=o; bkey=key;
         }
       }
       // วิชาที่เปิด variety: ถ้าข้อที่ดีที่สุดเป็นแนวที่หยิบไปแล้ว ลองหาแนวใหม่ที่ระดับข้างเคียงก่อน
-      if(best && SUB.variety && (n[best.q.arche]||0)>0){
+      // ทุกวิชา: ถ้าข้อที่ดีที่สุดเป็นแม่แบบซ้ำ ลองแนวใหม่ที่ระดับสูงขึ้นหนึ่งขั้น
+      const dupT = best && tmpls.has(tmplOf(best.q));
+      const dupA = best && SUB.variety && (n[best.q.arche]||0)>0;
+      if(dupT || dupA){
         let alt=null, akey=null, p2=0;
         for(const o of idx){
           p2++;
-          if(Math.abs(o.q.lvl-lv)!==1 || seen.has(o.i)) continue;
+          const dl=o.q.lvl-lv;
+          if(seen.has(o.i) || !(dl===1 || (SUB.variety && dl===-1))) continue;
+          if(tmpls.has(tmplOf(o.q))) continue;
           const a=o.q.arche, f=famOf(a);
           if((n[a]||0)>0) continue;
           if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
@@ -165,6 +173,7 @@ function pickPart(part,quota){
         const a=best.q.arche, f=famOf(a);
         out.push(best); seen.add(best.i); n[a]=(n[a]||0)+1;
         heads.add(head1(best.q));
+        tmpls.add(tmplOf(best.q));
         if(f) g[f]=(g[f]||0)+1;
       }
       stuck = best ? 0 : stuck+1;
@@ -208,6 +217,7 @@ const P=(runs,o={})=>new Paragraph({
   spacing:{before:o.before||0,after:o.after||0,
            ...(o.line===0?{}:{line:o.line||300,lineRule:LineRuleType.AUTO})},
   alignment:o.align,indent:o.indent,keepNext:o.keepNext,keepLines:true,
+  pageBreakBefore:o.pageBreakBefore,
   border:o.border,tabStops:o.tabStops,
   children:Array.isArray(runs)?runs:[T(runs,o)]});
 
@@ -287,10 +297,11 @@ QS.forEach((q,idx)=>{
   if(q.part!==part){
     part=q.part;
     const isP1=part===SUB.parts[0].key;
-    if(!isP1) kids.push(new Paragraph({children:[new PageBreak()]}));
+    // ขึ้นหน้าใหม่ด้วย pageBreakBefore ที่หัวพาร์ทเอง ไม่ใช่ย่อหน้าตัวขึ้นหน้าแยก
+    // แบบเดิมถ้าหน้าก่อนเต็มพอดีจะได้หน้าว่างหนึ่งหน้า (วีคคณิตชุดที่ 3 หน้า 8)
     kids.push(P([T(part,{size:34,bold:true,color:SUBC}),
                  T("   ·   "+((PMETA[part]||{}).label||""),{size:31,bold:true})],
-                {before:isP1?280:0,after:30,keepNext:true}));
+                {before:isP1?280:0,after:30,keepNext:true,pageBreakBefore:!isP1}));
     kids.push(P([T("")],
                 {after:180,keepNext:true,line:120,
                  border:{bottom:{style:BorderStyle.SINGLE,size:6,color:"00C8B5",space:5}}}));
