@@ -94,6 +94,45 @@ table{border-collapse:collapse; width:100%}
 .g-what{font-weight:600}
 .g-why{font-size:13px; color:var(--mid)}
 .gaps .chip{position:absolute; right:16px; top:14px}
+/* ไทม์ไลน์ชีท — หนึ่งคอลัมน์ต่อวีค แต่ละชุดเป็นจุดบนเส้นเวลา มีเช็กลิสต์สามขั้น */
+.weeks{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px 28px}
+.week{min-width:0}
+.week h4{font-size:15px; color:var(--ink); margin:0 0 12px}
+.track{list-style:none; margin:0; padding:0 0 0 22px; position:relative;
+  display:flex; flex-direction:column; gap:12px}
+.track::before{content:""; position:absolute; left:6px; top:10px; bottom:10px;
+  width:2px; background:var(--hair)}
+.set{position:relative; background:var(--panel); border:1px solid var(--hair);
+  padding:12px 14px; display:flex; flex-direction:column; gap:8px; min-width:0}
+.set::before{content:""; position:absolute; left:-21px; top:15px; width:12px; height:12px;
+  border-radius:50%; background:var(--bg); border:2px solid var(--off)}
+.set.ok::before{background:var(--ok); border-color:var(--ok)}
+.set.warn::before{background:var(--warn); border-color:var(--warn)}
+.set.ready::before{background:var(--bg); border-color:var(--teal)}
+.set.next{background:transparent; border-style:dashed}
+.sh{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.sh h3{font-size:16px}
+.chip.ready{color:var(--teal)}
+.steps{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px 14px}
+.step{display:grid; grid-template-columns:18px auto; column-gap:6px; align-items:center;
+  font-size:13px; line-height:1.3}
+.step .tick{grid-row:span 2; width:16px; height:16px; border-radius:50%;
+  border:1.5px solid var(--off); display:grid; place-items:center}
+.step .tick svg{width:11px; height:11px}
+.step.done .tick{background:var(--ok); border-color:var(--ok); color:var(--panel)}
+.step.now .tick{border-color:var(--warn); border-width:2px}
+.step .sl{color:var(--ink)}
+.step.todo .sl{color:var(--soft)}
+.step .ss{font-size:11px; color:var(--soft); font-family:"IBM Plex Mono",ui-monospace,monospace}
+.step.now .ss{color:var(--warn)}
+.sf{margin:0; font-size:12px; color:var(--mid); display:flex; flex-wrap:wrap;
+  align-items:center; gap:4px 6px; font-variant-numeric:tabular-nums}
+.sf .dot{color:var(--soft)}
+.mix{display:inline-flex; align-items:center; gap:6px}
+.mix .bar{width:56px}
+.sn{margin:0; font-size:13px; color:var(--mid)}
+.paused{margin:4px 0 0; font-size:13px; color:var(--mid); display:flex; flex-wrap:wrap;
+  align-items:center; gap:6px}
 footer{border-top:1px solid var(--hair); padding-top:16px}
 footer p{margin:0; font-size:12px; color:var(--soft)}
 @media(max-width:640px){

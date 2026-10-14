@@ -188,16 +188,22 @@ const NP=SUB.parts.length;
 const quota=SUB.parts.map((_,i)=>Math.floor(N/NP)+(i<N%NP?1:0));
 const QS=SUB.parts.flatMap((p,i)=>pickPart(p.key,quota[i]));
 // --record = จดลายนิ้วมือของชีทชุดนี้ลง ledger.json (make.bat ส่งมาตอนออกฉบับนักเรียน)
-if(argv.includes('--record')){
-  LEDGER[SUBJ]=LEDGER[SUBJ]||{};
-  LEDGER[SUBJ][String(SETNO)]={fp:QS.map(fpOf), tfp:QS.filter(textual).map(tfpOf),
-                                arche:[...new Set(QS.map(q=>q.arche))]};
-  fs.writeFileSync(LEDGER_F, JSON.stringify(LEDGER,null,1));
-}
 const nUsed=QS.filter(q=>isUsed({q})).length;
 if(USED.size) console.error(`ข้อที่เคยออกในชุดก่อนหน้า: ${nUsed} จาก ${QS.length} ข้อ`);
 const nNew=new Set(QS.map(q=>q.arche).filter(a=>!PREV_A.has(a))).size;
 if(PREV_A.size) console.error(`แนวที่ชุดก่อนหน้าไม่มี: ${nNew} แนว`);
+// --record = จดลายนิ้วมือของชีทชุดนี้ลง ledger.json (make.bat ส่งมาตอนออกฉบับนักเรียน)
+// จดวันที่ จำนวนข้อ สัดส่วนดาว และตัวเลขความซ้ำด้วย หน้าสถานะใช้วาดไทม์ไลน์
+if(argv.includes('--record')){
+  LEDGER[SUBJ]=LEDGER[SUBJ]||{};
+  const d=new Date(), pad=x=>String(x).padStart(2,'0');
+  LEDGER[SUBJ][String(SETNO)]={fp:QS.map(fpOf), tfp:QS.filter(textual).map(tfpOf),
+    arche:[...new Set(QS.map(q=>q.arche))],
+    date:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+    n:QS.length, stars:[1,2,3].map(lv=>QS.filter(q=>q.lvl===lv).length),
+    repeat:USED.size?nUsed:null, newArche:PREV_A.size?nNew:null};
+  fs.writeFileSync(LEDGER_F, JSON.stringify(LEDGER,null,1));
+}
 // --list = พิมพ์รายการข้อที่เลือกแล้วออก ใช้ตอนไล่บั๊กว่า "ข้อ 38" คือแนวไหน
 if(argv.includes('--list')){
   QS.forEach((q,i)=>console.log(String(i+1).padStart(3)+"  "+q.part+"  ลว."+q.lvl+"  "+q.arche

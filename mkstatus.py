@@ -70,6 +70,98 @@ GAPS = [
 TOTAL_CHECKED = "110,000+"
 
 
+TH_MONTH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
+STATUS = {"taught": ("ok", "สอนแล้ว"), "review": ("warn", "รอติวเตอร์ตรวจ"),
+          "ready": ("ready", "พร้อมสอน"), "next": ("off", "ยังไม่ออก")}
+CHECK = ('<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.3 2.3 4.7-5" '
+         'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+         'stroke-linejoin="round"/></svg>')
+
+
+def thdate(iso):
+    y, m, d = (int(x) for x in iso.split("-"))
+    return f"{d} {TH_MONTH[m - 1]}"
+
+
+def _step(state, label, sub):
+    """state: done = ทำแล้ว · now = กำลังรอขั้นนี้ · todo = ยังไม่ถึง"""
+    mark = CHECK if state == "done" else ""
+    return (f'<li class="step {state}"><span class="tick">{mark}</span>'
+            f'<span class="sl">{esc(label)}</span><span class="ss">{esc(sub)}</span></li>')
+
+
+def timeline_html():
+    tl = json.load(open(os.path.join(HERE, "timeline.json"), encoding="utf-8"))
+    led = json.load(open(os.path.join(HERE, "ledger.json"), encoding="utf-8"))
+    count = collections.Counter()
+    cols = []
+    for wk in tl["weeks"]:
+        L = led.get(wk["key"], {})
+        items = []
+        for st in wk["sets"]:
+            n = st["set"]
+            count[st["status"]] += 1
+            cls, chip = STATUS[st["status"]]
+            e = L.get(str(n), {})
+            prev = L.get(str(n - 1), {})
+            if st["status"] == "next":
+                items.append(
+                    f'<li class="set next"><div class="sh"><h3>ชุดที่ {n}</h3>'
+                    f'<span class="chip off">{chip}</span></div>'
+                    f'<p class="sn">{esc(st.get("note", ""))}</p></li>')
+                continue
+            rv = st.get("reviews", [])
+            s1 = _step("done", "ออกชีท", thdate(st["built"]))
+            if rv:
+                s2 = _step("done", f"ติวเตอร์ตรวจ {len(rv)} รอบ", "ถึง " + thdate(rv[-1]))
+            elif st["status"] == "review":
+                s2 = _step("now", "ติวเตอร์ตรวจ", "กำลังรอ")
+            else:
+                s2 = _step("todo", "ติวเตอร์ตรวจ", "ยังไม่ได้ตรวจ")
+            if st.get("taught"):
+                s3 = _step("done", "สอนในคาบ", "แจ้ง " + thdate(st["taught"]))
+            elif st["status"] == "ready":
+                s3 = _step("now", "สอนในคาบ", "รอสอน")
+            else:
+                s3 = _step("todo", "สอนในคาบ", "หลังตรวจเสร็จ")
+            facts = []
+            if e.get("n"):
+                facts.append(f'{e["n"]} ข้อ')
+            if e.get("stars"):
+                a, b, c = e["stars"]
+                tot = max(1, a + b + c)
+                facts.append(
+                    '<span class="mix" title="ง่าย / กลาง / ยาก">'
+                    f'<span class="bar"><i class="s1" style="width:{a * 100 / tot:.0f}%"></i>'
+                    f'<i class="s2" style="width:{b * 100 / tot:.0f}%"></i>'
+                    f'<i class="s3" style="width:{c * 100 / tot:.0f}%"></i></span>'
+                    f'ง่าย {a} · กลาง {b} · ยาก {c}</span>')
+            if e.get("repeat") is not None:
+                facts.append(f'ซ้ำชุดก่อน {e["repeat"]} ข้อ')
+            if e.get("arche") and prev.get("arche"):
+                new = len(set(e["arche"]) - set(prev["arche"]))
+                facts.append(f'แนวที่ชุดก่อนไม่มี {new}')
+            sep = ' <span class="dot">·</span> '
+            items.append(
+                f'<li class="set {cls}"><div class="sh"><h3>ชุดที่ {n}</h3>'
+                f'<span class="chip {cls}">{chip}</span></div>'
+                f'<ol class="steps">{s1}{s2}{s3}</ol>'
+                f'<p class="sf">{sep.join(facts)}</p>'
+                f'<p class="sn">{esc(st.get("note", ""))}</p></li>')
+        cols.append(f'<div class="week"><h4>{esc(wk["name"])}</h4>'
+                    f'<ol class="track">{"".join(items)}</ol></div>')
+    paused = "".join(
+        f'<p class="paused"><span class="chip off">พักไว้</span> <strong>{esc(p["name"])}</strong> '
+        f'เริ่ม {thdate(p["start"])} · พัก {thdate(p["paused"])} · {esc(p["note"])}</p>'
+        for p in tl.get("paused", []))
+    summary = (f'สอนไปแล้ว {count["taught"]} ชุด · พร้อมสอน {count["ready"]} ชุด · '
+               f'รอติวเตอร์ตรวจ {count["review"]} ชุด')
+    return (f'<section id="timeline"><h2>ไทม์ไลน์ชีท</h2>'
+            f'<p class="note wide">{summary}</p>'
+            f'<div class="weeks">{"".join(cols)}</div>{paused}</section>')
+
+
 def part(key):
     return [q for q in QS if q["part"] == key]
 
@@ -148,6 +240,7 @@ HTML = f"""<title>สถานะคลังโจทย์</title>
 <div><dt>แนวโจทย์</dt><dd>{len({q["arche"] for q in QS})}</dd></div>
 <div><dt>ข้อที่ตรวจซ้ำด้วยโค้ด</dt><dd>{TOTAL_CHECKED}</dd></div>
 </dl></header>
+{timeline_html()}
 <section><h2>สายการผลิต</h2><div class="lines">
 {"".join(rows_line)}
 </div>
