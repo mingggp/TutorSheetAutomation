@@ -24,8 +24,15 @@ const FAM = [['อนุกรม', /^(ลำดับ|อนุกรม|ปร
              ['เมทริกซ์', /^เมทริกซ์/],
              // โจทย์แนวคิดเขียนมือ พิสูจน์ด้วยโค้ดไม่ได้ จึงไม่ควรกินท่อนเกินสี่ข้อ
              // ชุดที่ 1 ของวีคฟิสิกส์มีถึง 15 จาก 40 ข้อ
-             ['แนวคิด', /^แนวคิด/]];
+             ['แนวคิด', /^แนวคิด/],
+             // ตัวที่สามคือเพดานเฉพาะตระกูล ไม่ใส่ = ใช้ FCAP
+             // ติวเตอร์ทักวีคฟิสิกส์ชุดที่ 2 (16 ต.ค. 69) ว่าพาร์ทเชิงกลมีข้อซ้ำ ๆ
+             // ตอนนั้นมีรอก 3 ข้อ เฟือง 2 ข้อ คาน 2 ข้อ — แต่ละแนวไม่เกิน CAP ก็จริง แต่หน้าตาเหมือนกัน
+             ['รอก', /^(ระบบรอก|รอกผสม)/, 1],
+             ['เฟือง', /^ชุดเฟือง/, 1],
+             ['คาน', /^คาน/, 1]];
 const famOf = a => { for(const [f,re] of FAM) if(re.test(a)) return f; return null; };
+const FCAPS = Object.fromEntries(FAM.map(([f,,c])=>[f, c===undefined?FCAP:c]));
 const SUBJ= arg('subject','tpat3');
 const SUB = JSON.parse(fs.readFileSync(path.join(__dirname,'subjects.json'),'utf8'))[SUBJ];
 if(!SUB||!SUB.parts){console.error('ไม่รู้จักวิชา "'+SUBJ+'" — ดูรายชื่อคีย์ใน subjects.json');process.exit(1);}
@@ -60,14 +67,23 @@ const USED_T=new Set(Object.entries(LEDGER[SUBJ]||{})
   .filter(([k])=>parseInt(k,10)<SETNO).flatMap(([,v])=>Array.isArray(v)?[]:(v.tfp||[])));
 const textual=q=>q.choices.some(c=>c&&c.trim());
 // ข้อที่ตัวเลือกเป็นรูป ข้อความโจทย์มักเหมือนกันทั้งแนว ต้องดูรูปด้วยเสมอ จึงใช้แค่ fp
+const fpO=o=>(o.fp===undefined?(o.fp=fpOf(o.q)):o.fp);
 const isUsed=o=>{
-  if(o.fp===undefined) o.fp=fpOf(o.q);
+  fpO(o);
   if(USED.has(o.fp)) return true;
   return textual(o.q) && USED_T.has(tfpOf(o.q));
 };
 // แนวที่ชุดก่อนหน้า (N-1) มีอยู่แล้ว — ชุดนี้หยิบแนวอื่นขึ้นก่อน
 const _prev=(LEDGER[SUBJ]||{})[String(SETNO-1)];
 const PREV_A=new Set(_prev&&!Array.isArray(_prev)?(_prev.arche||[]):[]);
+// ออกชุดที่มีอยู่แล้วซ้ำ = ปรับชุดเดิม (ติวเตอร์ขอแก้บางข้อ) ไม่ใช่สุ่มชุดใหม่ทั้งชุด
+// ข้อที่ชุดเดิมมีอยู่จึงได้เข้าก่อน ข้อที่หลุดคือข้อที่ติดเพดานใหม่หรือหายไปจากคลังเท่านั้น
+// ไม่มีตัวนี้ แค่เพิ่มแนวใหม่เข้าคลัง ลำดับการหมุนแนวก็เปลี่ยนทั้งพาร์ท ชีทที่ติวเตอร์ตรวจแล้วจะเปลี่ยนไปหมด
+const _cur=(LEDGER[SUBJ]||{})[String(SETNO)];
+const KEEP=new Set(_cur&&!Array.isArray(_cur)?(_cur.fp||[]):[]);
+// แนวที่ยังไม่เคยออกในชุดใดเลย (รวมฉบับเดิมของชุดนี้) — ช่องที่ว่างลงให้แนวใหม่จริงก่อน
+const SHOWN_A=new Set(Object.values(LEDGER[SUBJ]||{}).flatMap(v=>Array.isArray(v)?[]:(v.arche||[])));
+if(KEEP.size) console.error(`ปรับชุดที่ ${SETNO} ของเดิม — เก็บข้อเดิมไว้ก่อน (${KEEP.size} ข้อ)`);
 
 // ลำดับการหยิบตามระดับดาว ตัวแรกคือระดับหลักของชีท ที่เหลือคือตัวเติม
 // ชีทระดับกลางเติมด้วยข้อยากก่อนข้อง่าย เพราะข้อสอบความถนัดต้องมีข้อที่ยืดเพดานให้เด็ก
@@ -117,6 +133,7 @@ function pickPart(part,quota){
   const names=[]; idx.forEach(o=>{ if(!names.includes(o.q.arche)) names.push(o.q.arche); });
   const rank={}; names.forEach((a,i)=>{ rank[a]=(i+setn*7)%names.length; });
   const out=[], seen=new Set(), n={}, g={};
+  const fps=new Set();       // ลายนิ้วมือของข้อที่หยิบแล้ว — คลังมีข้อเดียวกันที่แค่สลับตัวเลือกอยู่หลายตัว
   const heads=new Set();     // บรรทัดแรกของคำถามที่หยิบเข้าชีทไปแล้ว
   const head1=q=>q.stem.split(/\r?\n/)[0].trim();
   // แม่แบบ = บรรทัดแรกที่ตัดตัวเลขทิ้ง สองข้อแม่แบบเดียวกันคือโจทย์เดิมเปลี่ยนเลข
@@ -135,14 +152,19 @@ function pickPart(part,quota){
       let best=null, bkey=null, pos=0;
       for(const o of idx){
         pos++;
-        if(o.q.lvl!==lv || seen.has(o.i)) continue;
+        // ข้อเดิมของชุดนี้ได้ช่องไหนก็ได้ไม่ว่าระดับใด ชุดเดิมเคยสลับระดับด้วย variety มาแล้ว
+        // ถ้าบังคับระดับตาม weave อีกรอบ ข้อเดิมบางข้อจะไม่มีช่องลง แล้วข้อใหม่จะแทรกเข้ามาแทน
+        if(seen.has(o.i) || (o.q.lvl!==lv && !KEEP.has(fpO(o)))) continue;
         const a=o.q.arche, f=famOf(a);
         if((n[a]||0)>=cap) continue;
-        if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
+        if(f && (g[f]||0)>=FCAPS[f]+(cap-CAP)) continue;
+        if(fps.has(fpO(o))) continue;
         // ลำดับความสำคัญ: กระจายแนวก่อน แล้วเลี่ยงคำถามซ้ำคำ แล้วค่อยหมุนตามชุด
         // ข้อที่เคยออกในชุดก่อนหน้าถูกเลือกทีหลังสุด แล้วค่อยดูความกว้างของแนว
-        const key=[isUsed(o)?1:0, (n[a]||0), tmpls.has(tmplOf(o.q))?1:0,
-                   PREV_A.has(a)?1:0, heads.has(head1(o.q))?1:0, rank[a], pos];
+        // ตอนปรับชุดเดิม ข้อเดิมของชุดนี้มาก่อนทุกอย่าง ถัดมาคือแนวที่ไม่เคยออกเลย
+        const key=[isUsed(o)?1:0, KEEP.has(o.fp)?0:1, (n[a]||0), tmpls.has(tmplOf(o.q))?1:0,
+                   PREV_A.has(a)?1:0, KEEP.size&&!SHOWN_A.has(a)?0:1,
+                   heads.has(head1(o.q))?1:0, rank[a], pos];
         if(!bkey || key.some((v,z)=>v<bkey[z] && key.slice(0,z).every((u,y)=>u===bkey[y]))){
           best=o; bkey=key;
         }
@@ -151,16 +173,17 @@ function pickPart(part,quota){
       // ทุกวิชา: ถ้าข้อที่ดีที่สุดเป็นแม่แบบซ้ำ ลองแนวใหม่ที่ระดับสูงขึ้นหนึ่งขั้น
       const dupT = best && tmpls.has(tmplOf(best.q));
       const dupA = best && SUB.variety && (n[best.q.arche]||0)>0;
-      if(dupT || dupA){
+      if((dupT || dupA) && !KEEP.has(best.fp)){
         let alt=null, akey=null, p2=0;
         for(const o of idx){
           p2++;
           const dl=o.q.lvl-lv;
           if(seen.has(o.i) || !(dl===1 || (SUB.variety && dl===-1))) continue;
+          if(fps.has(fpO(o))) continue;
           if(tmpls.has(tmplOf(o.q))) continue;
           const a=o.q.arche, f=famOf(a);
           if((n[a]||0)>0) continue;
-          if(f && (g[f]||0)>=FCAP+(cap-CAP)) continue;
+          if(f && (g[f]||0)>=FCAPS[f]+(cap-CAP)) continue;
           if(isUsed(o)) continue;
           const k2=[-o.q.lvl, PREV_A.has(a)?1:0, rank[a], p2];
           if(!akey || k2.some((v,z)=>v<akey[z] && k2.slice(0,z).every((u,y)=>u===akey[y]))){
@@ -172,6 +195,7 @@ function pickPart(part,quota){
       if(best){
         const a=best.q.arche, f=famOf(a);
         out.push(best); seen.add(best.i); n[a]=(n[a]||0)+1;
+        fps.add(best.fp);
         heads.add(head1(best.q));
         tmpls.add(tmplOf(best.q));
         if(f) g[f]=(g[f]||0)+1;

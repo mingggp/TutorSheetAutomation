@@ -1916,3 +1916,136 @@ def wave(amp, lam, nlam, name, ux=26, uy=14, pad=18, xunit="m", yunit="cm"):
         pts.append((ox + x * ux * S, oy - y * uy * S))
     d.line(pts, fill=INK, width=2 * lw)
     return _psave(im, W, H, name)
+
+
+# ================================================================ วีคฟิสิกส์ — แนวเชิงกลจาก FEST2026 (16 ต.ค. 69)
+
+def atwood(name, h_label="h", unit=1.0, pad=16):
+    """เครื่องแอดวูด — รอกตายตัวที่เพดาน เชือกคล้องก้อน A (สูงจากพื้น) กับก้อน B (วางบนพื้น)"""
+    W, H = 220, 230
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    cx, cy, r = 110, 42, 22
+    d.rectangle([60 * S, 10 * S, 160 * S, 18 * S], fill=LEFTF, outline=INK, width=lw)
+    d.line([cx * S, 18 * S, cx * S, (cy - r) * S], fill=INK, width=lw)
+    d.ellipse([(cx - r) * S, (cy - r) * S, (cx + r) * S, (cy + r) * S], fill=TOPF, outline=INK, width=lw)
+    d.ellipse([(cx - 3) * S, (cy - 3) * S, (cx + 3) * S, (cy + 3) * S], fill=INK)
+    yg = 200
+    ya, yb = 120, yg - 30          # ขอบบนของก้อน A กับก้อน B
+    xa, xb = cx - r, cx + r
+    d.line([xa * S, cy * S, xa * S, ya * S], fill=INK, width=lw)
+    d.line([xb * S, cy * S, xb * S, yb * S], fill=INK, width=lw)
+    f = font(14, True)
+    for x, y, lab in ((xa, ya, "A"), (xb, yb, "B")):
+        d.rectangle([(x - 16) * S, y * S, (x + 16) * S, (y + 30) * S], fill=LEFTF, outline=INK, width=lw)
+        _ctext(d, x * S, (y + 15) * S, lab, f)
+    d.line([20 * S, yg * S, 200 * S, yg * S], fill=INK, width=lw)
+    for k in range(20, 200, 9):
+        d.line([k * S, yg * S, (k - 6) * S, (yg + 6) * S], fill=LINEG, width=lw)
+    if not h_label:
+        return _psave(im, W, H, name)
+    xm = xa - 34                    # เส้นบอกความสูงของก้อน A จากพื้น
+    yA = ya + 30
+    d.line([xm * S, yA * S, xm * S, yg * S], fill=INK, width=lw)
+    for yy, sg in ((yA, 1), (yg, -1)):
+        d.polygon([(xm * S, yy * S), ((xm - 4) * S, (yy + sg * 7) * S), ((xm + 4) * S, (yy + sg * 7) * S)],
+                  fill=INK)
+    d.line([(xm - 6) * S, yA * S, (xa - 16) * S, yA * S], fill=LINEG, width=lw)
+    _ctext(d, (xm - 12) * S, (yA + yg) / 2 * S, h_label, font(14, True))
+    return _psave(im, W, H, name)
+
+
+def roughstrip(L_lab, x_lab, name, frac=.4):
+    """แท่งไม้ไถลจากพื้นลื่นเข้าไปในพื้นฝืด — frac = สัดส่วนความยาวที่อยู่บนพื้นฝืดแล้ว"""
+    W, H = 340, 120
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    yg = 70
+    xr = 190                       # รอยต่อพื้นลื่นกับพื้นฝืด
+    d.line([16 * S, yg * S, xr * S, yg * S], fill=INK, width=lw)
+    d.rectangle([xr * S, yg * S, (W - 16) * S, (yg + 8) * S], fill="white", outline=INK, width=lw)
+    for k in range(xr, W - 16, 7):
+        d.line([k * S, (yg + 8) * S, (k + 6) * S, yg * S], fill=INK, width=lw)
+    Lp = 150
+    x1 = xr + frac * Lp
+    x0 = x1 - Lp
+    d.rectangle([x0 * S, (yg - 16) * S, x1 * S, yg * S], fill=TOPF, outline=INK, width=lw)
+    _arr(d, (x0 + 20) * S, (yg - 30) * S, (x0 + 70) * S, (yg - 30) * S, lw)
+    _ctext(d, (x0 + 45) * S, (yg - 42) * S, "v", font(13, True))
+    fd = font(12, False)
+    yd = yg + 24
+    for a, b, lab in ((x0, x1, L_lab), (xr, x1, x_lab)):
+        yy = yd if lab == L_lab else yd + 18
+        d.line([a * S, yy * S, b * S, yy * S], fill=INK, width=lw)
+        for xe in (a, b):
+            d.line([xe * S, (yy - 4) * S, xe * S, (yy + 4) * S], fill=INK, width=lw)
+        _ctext(d, (a + b) / 2 * S, (yy - 7) * S, lab, fd)
+    _ctext(d, 60 * S, (yg + 14) * S, "พื้นลื่น", fd)
+    _ctext(d, (W - 50) * S, (yg - 10) * S, "พื้นฝืด", fd)
+    return _psave(im, W, H, name)
+
+
+def plankstack(name, shown=4, unit=22, k=8, first=1.0):
+    """แท่งไม้ยาวเท่ากันซ้อนเหลื่อมกันบนขอบโต๊ะ (ติดกาวแน่น)
+    แท่งล่างยื่นเลยขอบโต๊ะ a (= first เท่าของ d) แท่งถัดไปยื่นเลยแท่งล่างอีก d ทุกแท่ง
+    k = L/d ใช้กำหนดความยาวแท่งในรูป (ไม่ได้วาดตามสเกลจริงเกิน 10 ช่วง)"""
+    dpx = unit
+    Lp = min(max(k, 5), 10) * unit
+    apx = max(.5, min(2.5, first)) * unit
+    W = int(30 + Lp + shown * dpx + 50)
+    H = shown * 16 + 84
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    x0b = 30
+    edge = x0b + Lp - apx           # ขอบโต๊ะ: แท่งล่างสุดยื่นเลยขอบไป a
+    yt = H - 46
+    d.rectangle([6 * S, yt * S, edge * S, (yt + 10) * S], fill=LEFTF, outline=INK, width=lw)
+    d.rectangle([(edge - 22) * S, (yt + 10) * S, (edge - 14) * S, (H - 4) * S], fill=LEFTF, outline=INK, width=lw)
+    for kk in range(shown):
+        x0 = x0b + kk * dpx
+        y0 = yt - (kk + 1) * 14
+        d.rectangle([x0 * S, y0 * S, (x0 + Lp) * S, (y0 + 14) * S], fill=TOPF, outline=INK, width=lw)
+    f = font(13, True)
+    xtop = x0b + (shown - 1) * dpx
+    ytop = yt - shown * 14 - 12
+    d.line([xtop * S, ytop * S, (xtop + Lp) * S, ytop * S], fill=INK, width=lw)
+    for xe in (xtop, xtop + Lp):
+        d.line([xe * S, (ytop - 4) * S, xe * S, (ytop + 4) * S], fill=INK, width=lw)
+    _ctext(d, (xtop + Lp / 2) * S, (ytop - 9) * S, "L", f)
+    _ctext(d, (xtop + Lp + 22) * S, (ytop + 4) * S, "...", font(14, True))
+    yd = yt + 22                   # ช่วงยื่น: a จากขอบโต๊ะถึงปลายแท่งล่าง แล้ว d ต่อ ๆ ไป
+    marks = [edge] + [x0b + Lp + kk * dpx for kk in range(shown)]
+    for i, (p, q) in enumerate(zip(marks, marks[1:])):
+        d.line([p * S, yd * S, q * S, yd * S], fill=INK, width=lw)
+        for xe in (p, q):
+            d.line([xe * S, (yd - 4) * S, xe * S, (yd + 4) * S], fill=INK, width=lw)
+        _ctext(d, (p + q) / 2 * S, (yd + 12) * S, "a" if i == 0 else "d", f)
+    d.line([edge * S, (yt + 10) * S, edge * S, (yd + 4) * S], fill=LINEG, width=lw)
+    return _psave(im, W, H, name)
+
+
+def table(rows, name, colw=None, rowh=30, pad=10):
+    """ตารางข้อความ แถวแรกเป็นหัวตาราง — ใช้กับโจทย์ที่ต้องอ่านค่าจากตาราง"""
+    f, fb = font(13, False), font(13, True)
+    ncol = len(rows[0])
+    if colw is None:
+        colw = [max(int(_tl(fb, str(r[c])) / S) + 24 for r in rows) for c in range(ncol)]
+    W = sum(colw) + pad * 2
+    H = rowh * len(rows) + pad * 2
+    im = Image.new("RGB", (W * S, H * S), "white")
+    d = ImageDraw.Draw(im)
+    lw = max(1, S)
+    y = pad
+    for i, r in enumerate(rows):
+        x = pad
+        if i == 0:
+            d.rectangle([pad * S, y * S, (W - pad) * S, (y + rowh) * S], fill=TOPF)
+        for c, cell in enumerate(r):
+            d.rectangle([x * S, y * S, (x + colw[c]) * S, (y + rowh) * S], outline=INK, width=lw)
+            _ctext(d, (x + colw[c] / 2) * S, (y + rowh / 2 + 3) * S, str(cell), fb if i == 0 else f)
+            x += colw[c]
+        y += rowh
+    return _psave(im, W, H, name)

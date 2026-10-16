@@ -46,12 +46,15 @@ echo [1/4] สร้างคลังโจทย์ ...
 python gen.py
 if errorlevel 1 goto err
 
-echo [2/4] ประกอบชีทนักเรียน ...
-node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --record --out "%STU%.docx"
+REM  ฉบับครูต้องประกอบก่อนฉบับนักเรียน เพราะฉบับนักเรียนจด ledger.json (--record)
+REM  และตอนออกชุดเดิมซ้ำ build.js เก็บข้อเดิมของชุดนี้ไว้ก่อน ถ้าฉบับครูอ่าน ledger หลังจด
+REM  จะเห็นชุดคนละฉบับกับที่ฉบับนักเรียนเห็น แล้วเฉลยอาจไม่ตรงกับชีท
+echo [2/4] ประกอบฉบับครู ...
+node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --key --out "%KEY%.docx"
 if errorlevel 1 goto err
 
-echo [3/4] ประกอบฉบับครู ...
-node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --key --out "%KEY%.docx"
+echo [3/4] ประกอบชีทนักเรียน ...
+node build.js --subject %SUBJ% --mix %MIX% --n %NUM% --set %SETNO% --record --out "%STU%.docx"
 if errorlevel 1 goto err
 
 echo [4/5] แปลงเป็น PDF ...
